@@ -10,6 +10,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { dayKeyFromDate } from '../../controller/dateFieldValue';
 import { useFinance } from '../../controller/FinanceProvider';
 import { useReminders } from '../../controller/ReminderProvider';
 import { useSettings } from '../../controller/SettingsProvider';
@@ -24,12 +25,16 @@ import { formatFriendlyMoney } from '../../model/finance/Expense';
 import type { CardBankPromotion, CreditCardAccount } from '../../model/reminders/creditCards';
 import type { MoneyCurrency } from '../../model/settings/AppSettings';
 import { toDayKey } from '../../utils/dateUtils';
+import { hapticSuccess } from '../../utils/haptics';
+import { createId } from '../../utils/idUtils';
 import { appHref } from '../../utils/navigation';
+import { CardPickerForPromoModal } from '../components/CardPickerForPromoModal';
 import { Chip } from '../components/Chip';
 import { EmptyState } from '../components/EmptyState';
 import { GlassSurface } from '../components/GlassSurface';
 import { KeyboardDismissScrollView } from '../components/KeyboardDismissScrollView';
 import { PrimaryButton } from '../components/PrimaryButton';
+import { PromoEditorModal } from '../components/PromoEditorModal';
 import { ScreenHeader } from '../components/ScreenHeader';
 import { ScreenScaffold } from '../components/ScreenScaffold';
 import { expenseCategoryLabel, TYPE_ICON_SIZE, type TypeIconName } from '../icons/typeIcons';
@@ -51,9 +56,10 @@ interface ActivePromoRow {
 /**
  * Purpose: You → Money → Payment cards — view / add / edit CreditCard accounts with bank
  *   grouping, monthly rebate health, and bank-promotion registration.
- * Inputs: ReminderProvider.creditCards + toggle; FinanceProvider.expenses; settings currency.
- * Outputs: neumorph list with All / By Bank / Promotions segments linking to CreditCardEditScreen.
- * Side effects: navigation; promotion registration toggles via ReminderProvider.
+ * Inputs: ReminderProvider.creditCards + toggle/upsert; FinanceProvider.expenses; settings currency.
+ * Outputs: neumorph list with All / By Bank / Promotions segments; Promotions tab can add/edit
+ *   promos via PromoEditorModal (+ card picker when multiple cards).
+ * Side effects: navigation; promotion registration/upsert via ReminderProvider; success haptic.
  * Design decisions: pure rebate math stays in creditCardRebates; this View only formats and
  *   orchestrates. Promotions list uses date-window eligibility (not registration) so users can
  *   1-tap register. Cap bar prefers monthlyRebateCap, then monthlySpendCap.
@@ -65,9 +71,12 @@ export function PaymentCardsScreen() {
   const { t } = useI18n();
   const { type } = useTypography();
   const { settings } = useSettings();
-  const { creditCards, toggleCardPromotionRegistration } = useReminders();
+  const { creditCards, toggleCardPromotionRegistration, upsertCardPromotion } = useReminders();
   const { expenses } = useFinance();
   const [viewMode, setViewMode] = useState<CardsViewMode>('all');
+  const [promoDraft, setPromoDraft] = useState<CardBankPromotion | null>(null);
+  const [promoTargetCardId, setPromoTargetCardId] = useState<string | null>(null);
+  const [cardPickerOpen, setCardPickerOpen] = useState(false);
   const currency = settings.defaultCurrency;
 
   const rebateExpenses = useMemo(
@@ -96,9 +105,64 @@ export function PaymentCardsScreen() {
     [creditCards],
   );
 
+  const promoTargetCard = useMemo(
+    () => creditCards.find((card) => card.id === promoTargetCardId) ?? null,
+    [creditCards, promoTargetCardId],
+  );
+
   const openCard = (cardId: string) => {
     router.push(appHref(`/reminders/card/${cardId}`));
   };
+
+  const openNewPromoForCard = (cardId: string) => {
+    const today = dayKeyFromDate(new Date());
+    const end = new Date();
+    end.setMonth(end.getMonth() + 1);
+    setPromoTargetCardId(cardId);
+    setPromoDraft({
+      id: createId(),
+      title: '',
+      extraRebateRate: 0.03,
+      startDate: today,
+      endDate: dayKeyFromDate(end),
+      requiresRegistration: true,
+      isRegistered: false,
+    });
+  };
+
+  const startAddPromotion = () => {
+    if (creditCards.length === 0) {
+      router.push(appHref('/reminders/card/new'));
+      return;
+    }
+    if (creditCards.length === 1) {
+      openNewPromoForCard(creditCards[0]!.id);
+      return;
+    }
+    setCardPickerOpen(true);
+  };
+
+  const openEditPromotion = (card: CreditCardAccount, promo: CardBankPromotion) => {
+    setPromoTargetCardId(card.id);
+    setPromoDraft({ ...promo });
+  };
+
+  const closePromoEditor = () => {
+    setPromoDraft(null);
+    setPromoTargetCardId(null);
+  };
+
+  const savePromotion = async (promo: CardBankPromotion) => {
+    if (!promoTargetCardId) {
+      return;
+    }
+    await upsertCardPromotion(promoTargetCardId, promo);
+    void hapticSuccess();
+    closePromoEditor();
+  };
+
+  const promotionsMode = viewMode === 'promotions';
+  const primaryIsAddPromo = promotionsMode && creditCards.length > 0;
 
   return (
     <ScreenScaffold>
@@ -109,7 +173,38 @@ export function PaymentCardsScreen() {
       >
         <Text style={[type.subhead, { color: colors.muted }]}>{t('money.paymentCardsLede')}</Text>
 
-        {creditCards.length === 0 ? (
+        <View style={styles.segmentRow}>
+          <Chip
+            label={t('cardRewards.allCards')}
+            selected={viewMode === 'all'}
+            onPress={() => setViewMode('all')}
+          />
+          <Chip
+            label={t('cardRewards.groupByBank')}
+            selected={viewMode === 'bank'}
+            onPress={() => setViewMode('bank')}
+          />
+          <Chip
+            label={t('cardRewards.viewPromotions')}
+            selected={viewMode === 'promotions'}
+            onPress={() => setViewMode('promotions')}
+          />
+        </View>
+
+        {promotionsMode ? (
+          <PromotionsSection
+            rows={activePromos}
+            cardCount={creditCards.length}
+            colors={colors}
+            t={t}
+            onToggle={(cardId, promoId) => {
+              void toggleCardPromotionRegistration(cardId, promoId);
+            }}
+            onEditPromo={openEditPromotion}
+            onAddPromotion={startAddPromotion}
+            onAddCard={() => router.push(appHref('/reminders/card/new'))}
+          />
+        ) : creditCards.length === 0 ? (
           <EmptyState
             message={t('money.paymentCardsEmpty')}
             backdropIcon="card-outline"
@@ -117,69 +212,63 @@ export function PaymentCardsScreen() {
             actionIcon="card-outline"
             onAction={() => router.push(appHref('/reminders/card/new'))}
           />
+        ) : viewMode === 'bank' ? (
+          <BankGroupedList
+            groups={bankGroups}
+            summaryByCardId={summaryByCardId}
+            currency={currency}
+            colors={colors}
+            t={t}
+            onOpenCard={openCard}
+          />
         ) : (
-          <>
-            <View style={styles.segmentRow}>
-              <Chip
-                label={t('cardRewards.allCards')}
-                selected={viewMode === 'all'}
-                onPress={() => setViewMode('all')}
-              />
-              <Chip
-                label={t('cardRewards.groupByBank')}
-                selected={viewMode === 'bank'}
-                onPress={() => setViewMode('bank')}
-              />
-              <Chip
-                label={t('cardRewards.viewPromotions')}
-                selected={viewMode === 'promotions'}
-                onPress={() => setViewMode('promotions')}
-              />
-            </View>
-
-            {viewMode === 'promotions' ? (
-              <PromotionsSection
-                rows={activePromos}
-                colors={colors}
-                t={t}
-                onToggle={(cardId, promoId) => {
-                  void toggleCardPromotionRegistration(cardId, promoId);
-                }}
-                onOpenCard={openCard}
-              />
-            ) : viewMode === 'bank' ? (
-              <BankGroupedList
-                groups={bankGroups}
-                summaryByCardId={summaryByCardId}
+          <View style={styles.list}>
+            {creditCards.map((card) => (
+              <PaymentCardRow
+                key={card.id}
+                card={card}
+                summary={summaryByCardId.get(card.id)}
                 currency={currency}
                 colors={colors}
                 t={t}
-                onOpenCard={openCard}
+                onPress={() => openCard(card.id)}
               />
-            ) : (
-              <View style={styles.list}>
-                {creditCards.map((card) => (
-                  <PaymentCardRow
-                    key={card.id}
-                    card={card}
-                    summary={summaryByCardId.get(card.id)}
-                    currency={currency}
-                    colors={colors}
-                    t={t}
-                    onPress={() => openCard(card.id)}
-                  />
-                ))}
-              </View>
-            )}
-
-            <PrimaryButton
-              icon="card-outline"
-              label={t('money.addCard')}
-              onPress={() => router.push(appHref('/reminders/card/new'))}
-            />
-          </>
+            ))}
+          </View>
         )}
+
+        <PrimaryButton
+          icon={primaryIsAddPromo ? 'sparkles-outline' : 'card-outline'}
+          label={primaryIsAddPromo ? t('cardRewards.addPromotion') : t('money.addCard')}
+          onPress={() => {
+            if (primaryIsAddPromo) {
+              startAddPromotion();
+              return;
+            }
+            router.push(appHref('/reminders/card/new'));
+          }}
+        />
       </KeyboardDismissScrollView>
+
+      <CardPickerForPromoModal
+        visible={cardPickerOpen}
+        cards={creditCards}
+        onClose={() => setCardPickerOpen(false)}
+        onSelect={(cardId) => {
+          setCardPickerOpen(false);
+          openNewPromoForCard(cardId);
+        }}
+      />
+
+      <PromoEditorModal
+        draft={promoDraft}
+        currency={currency}
+        cardName={promoTargetCard?.name}
+        onClose={closePromoEditor}
+        onSave={(promo) => {
+          void savePromotion(promo);
+        }}
+      />
     </ScreenScaffold>
   );
 }
@@ -458,30 +547,51 @@ function tierAbbreviation(cardTier?: string): string {
 }
 
 /**
- * Purpose: aggregate active bank promotions with registration toggle.
- * Inputs: promo rows across cards.
- * Outputs: promo cards or empty copy.
- * Side effects: toggle callback.
+ * Purpose: aggregate active bank promotions with registration toggle and inline edit/add.
+ * Inputs: promo rows across cards; card count for empty-state branch.
+ * Outputs: promo cards, or neumorph empty state with CTA.
+ * Side effects: toggle / edit / add callbacks owned by parent.
  */
 function PromotionsSection({
   rows,
+  cardCount,
   colors,
   t,
   onToggle,
-  onOpenCard,
+  onEditPromo,
+  onAddPromotion,
+  onAddCard,
 }: {
   rows: ActivePromoRow[];
+  cardCount: number;
   colors: ThemeColors;
   t: Translate;
   onToggle: (cardId: string, promoId: string) => void;
-  onOpenCard: (cardId: string) => void;
+  onEditPromo: (card: CreditCardAccount, promo: CardBankPromotion) => void;
+  onAddPromotion: () => void;
+  onAddCard: () => void;
 }) {
   const { type, scaleFontSize } = useTypography();
 
   if (rows.length === 0) {
+    const noCards = cardCount === 0;
     return (
       <GlassSurface style={styles.emptyPromo} radius={18}>
-        <Text style={[type.subhead, { color: colors.muted }]}>{t('cardRewards.noPromotions')}</Text>
+        <View style={styles.emptyPromoIconWrap} accessible={false} importantForAccessibility="no">
+          <Ionicons
+            name={noCards ? 'card-outline' : 'megaphone-outline'}
+            size={36}
+            color={colors.faint}
+          />
+        </View>
+        <Text style={[type.subhead, { color: colors.muted, textAlign: 'center' }]}>
+          {noCards ? t('cardRewards.noCardsForPromo') : t('cardRewards.noPromotionsHint')}
+        </Text>
+        <PrimaryButton
+          icon={noCards ? 'card-outline' : 'sparkles-outline'}
+          label={noCards ? t('money.addCard') : t('cardRewards.addPromotion')}
+          onPress={noCards ? onAddCard : onAddPromotion}
+        />
       </GlassSurface>
     );
   }
@@ -496,8 +606,9 @@ function PromotionsSection({
         return (
           <Pressable
             key={`${card.id}:${promo.id}`}
-            onPress={() => onOpenCard(card.id)}
+            onPress={() => onEditPromo(card, promo)}
             accessibilityRole="button"
+            accessibilityLabel={t('cardRewards.editPromotion')}
           >
             <GlassSurface style={styles.promoCard} radius={18}>
               <View style={styles.promoHead}>
@@ -505,6 +616,7 @@ function PromotionsSection({
                 <Text style={[type.footnote, { color: colors.muted, flex: 1 }]} numberOfLines={1}>
                   {`${bankName} · ${card.name}`}
                 </Text>
+                <Ionicons name="create-outline" size={18} color={colors.faint} />
               </View>
               <Text style={[type.headline, { color: colors.ink }]}>{promo.title}</Text>
               <View style={styles.chipWrap}>
@@ -909,6 +1021,12 @@ const styles = StyleSheet.create({
   },
   emptyPromo: {
     padding: 18,
+    gap: 14,
+    alignItems: 'stretch',
+  },
+  emptyPromoIconWrap: {
+    alignItems: 'center',
+    opacity: 0.85,
   },
   promoCard: {
     padding: 16,

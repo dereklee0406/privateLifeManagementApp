@@ -17,7 +17,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useReminders } from '../../controller/ReminderProvider';
 import { useSettings } from '../../controller/SettingsProvider';
-import { dateFromDayKey, dayKeyFromDate } from '../../controller/dateFieldValue';
+import { dayKeyFromDate } from '../../controller/dateFieldValue';
 import { formatFriendlyMoney } from '../../model/finance/Expense';
 import {
   BUILTIN_BANKS,
@@ -40,11 +40,11 @@ import { bankDisplayName, CardPresetModal, categoryLabel } from '../components/C
 import { CardBillingCycleCard } from '../components/CardBillingCycleCard';
 import { CardSpendSimulator } from '../components/CardSpendSimulator';
 import { Chip } from '../components/Chip';
-import { DateField } from '../components/DateField';
 import { GlassSurface } from '../components/GlassSurface';
 import { KeyboardDismissScrollView } from '../components/KeyboardDismissScrollView';
 import { NumberStepper } from '../components/NumberStepper';
 import { PrimaryButton } from '../components/PrimaryButton';
+import { PromoEditorModal } from '../components/PromoEditorModal';
 import { ScreenHeader } from '../components/ScreenHeader';
 import { ScreenScaffold } from '../components/ScreenScaffold';
 import { SectionActionButton } from '../components/SectionActionButton';
@@ -1038,141 +1038,6 @@ function RuleEditorModal({
                   monthlySpendCap: parseOptionalNumber(spendCap),
                   monthlyRebateCap: parseOptionalNumber(rebateCap),
                   minSpendPerTx: parseOptionalNumber(minTx),
-                });
-              }}
-            />
-          </ScrollView>
-        </SheetChrome>
-      </GestureHandlerRootView>
-    </Modal>
-  );
-}
-
-/**
- * Purpose: add/edit a bank promotion campaign in a sheet modal.
- * Inputs: draft promo or null; currency; close/save.
- * Outputs: title, rate, date range, registration, cap fields.
- * Side effects: none besides callbacks.
- * Design decisions: promotion windows are real calendar dates (YYYY-MM-DD), so DateField is appropriate here.
- */
-function PromoEditorModal({
-  draft,
-  currency,
-  onClose,
-  onSave,
-}: {
-  draft: CardBankPromotion | null;
-  currency: MoneyCurrency;
-  onClose: () => void;
-  onSave: (promo: CardBankPromotion) => void;
-}) {
-  const colors = useThemeColors();
-  const { t } = useI18n();
-  const [title, setTitle] = useState('');
-  const [rateDraft, setRateDraft] = useState('3');
-  const [startDate, setStartDate] = useState(dayKeyFromDate(new Date()));
-  const [endDate, setEndDate] = useState(dayKeyFromDate(new Date()));
-  const [requiresRegistration, setRequiresRegistration] = useState(true);
-  const [isRegistered, setIsRegistered] = useState(false);
-  const [maxCap, setMaxCap] = useState('');
-
-  useEffect(() => {
-    if (!draft) {
-      return;
-    }
-    setTitle(draft.title);
-    setRateDraft(formatPercentInput(draft.extraRebateRate));
-    setStartDate(draft.startDate);
-    setEndDate(draft.endDate);
-    setRequiresRegistration(draft.requiresRegistration);
-    setIsRegistered(draft.isRegistered);
-    setMaxCap(draft.maxRebateCap !== undefined ? String(draft.maxRebateCap) : '');
-  }, [draft?.id]);
-
-  if (!draft) {
-    return null;
-  }
-
-  return (
-    <Modal visible animationType="slide" onRequestClose={onClose}>
-      <GestureHandlerRootView style={[styles.modalRoot, { backgroundColor: colors.paper }]}>
-        <SheetChrome>
-          <View style={styles.modalHeader}>
-            <TextButton label={t('common.cancel')} tone="muted" onPress={onClose} />
-            <Text style={[type.title2, { color: colors.ink }]}>{t('cardRewards.editPromotion')}</Text>
-          </View>
-          <ScrollView contentContainerStyle={styles.modalBody} keyboardShouldPersistTaps="handled">
-            <Text style={[styles.label, { color: colors.faint }]}>{t('cardRewards.promoTitle')}</Text>
-            <TextInput
-              value={title}
-              onChangeText={setTitle}
-              placeholder={t('cardRewards.promoTitlePlaceholder')}
-              placeholderTextColor={colors.faint}
-              style={[insetSurface(colors, 16), styles.amount, { color: colors.ink }]}
-            />
-            <Text style={[styles.label, { color: colors.faint }]}>{t('cardRewards.extraRebateRate')}</Text>
-            <View style={[insetSurface(colors, 16), styles.affixWell]}>
-              <TextInput
-                value={rateDraft}
-                onChangeText={setRateDraft}
-                keyboardType="decimal-pad"
-                style={[styles.affixInput, { color: colors.ink }]}
-                accessibilityLabel={t('cardRewards.extraRebateRate')}
-              />
-              <View style={[styles.affixBadge, { backgroundColor: colors.accentSoft }]}>
-                <Text style={[styles.affixBadgeText, { color: colors.accent }]}>%</Text>
-              </View>
-            </View>
-            <DateField
-              label={t('cardRewards.startDate')}
-              value={dateFromDayKey(startDate)}
-              onChange={(next) => setStartDate(dayKeyFromDate(next))}
-            />
-            <DateField
-              label={t('cardRewards.endDate')}
-              value={dateFromDayKey(endDate)}
-              onChange={(next) => setEndDate(dayKeyFromDate(next))}
-            />
-            <View style={styles.enabled}>
-              <Text style={[styles.meta, { color: colors.muted }]}>{t('cardRewards.requiresRegistration')}</Text>
-              <Switch
-                value={requiresRegistration}
-                onValueChange={setRequiresRegistration}
-                trackColor={{ false: colors.line, true: colors.accent }}
-                thumbColor={colors.scheme === 'dark' ? '#E4DDD4' : '#FFF8F2'}
-              />
-            </View>
-            <View style={styles.enabled}>
-              <Text style={[styles.meta, { color: colors.muted }]}>{t('cardRewards.isRegistered')}</Text>
-              <Switch
-                value={isRegistered}
-                onValueChange={setIsRegistered}
-                trackColor={{ false: colors.line, true: colors.accent }}
-                thumbColor={colors.scheme === 'dark' ? '#E4DDD4' : '#FFF8F2'}
-              />
-            </View>
-            <OptionalNumberField
-              label={t('cardRewards.maxPromoRebate')}
-              value={maxCap}
-              onChangeText={setMaxCap}
-              colors={colors}
-              currency={currency}
-              placeholder={t('cardRewards.capPlaceholder')}
-            />
-            <PrimaryButton
-              icon="checkmark-circle-outline"
-              label={t('cardRewards.savePromotion')}
-              onPress={() => {
-                const rate = Number(rateDraft);
-                onSave({
-                  ...draft,
-                  title: title.trim() || t('cardRewards.editPromotion'),
-                  extraRebateRate: Number.isFinite(rate) && rate >= 0 ? rate / 100 : draft.extraRebateRate,
-                  startDate,
-                  endDate,
-                  requiresRegistration,
-                  isRegistered,
-                  maxRebateCap: parseOptionalNumber(maxCap),
                 });
               }}
             />

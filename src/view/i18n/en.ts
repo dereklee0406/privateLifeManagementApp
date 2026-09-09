@@ -301,6 +301,10 @@ export const en = {
     registeredPromo: 'Registered',
     activePromotions: 'Active promotions',
     noPromotions: 'No promotions right now',
+    noPromotionsHint:
+      'No promotions right now. Add a bank promotion to earn extra cashback on your spending.',
+    noCardsForPromo: 'Add a card first to configure and track bank promotions.',
+    selectCardForPromo: 'Select card for promotion',
     choosePreset: 'Choose from popular cards',
     popularPresets: 'Popular cards',
     baseRateBadge: '%{rate}% Base',

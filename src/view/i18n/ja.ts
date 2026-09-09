@@ -303,6 +303,10 @@ export const ja: TranslationCatalog = {
     registeredPromo: '登録済み',
     activePromotions: '開催中のキャンペーン',
     noPromotions: 'キャンペーンはありません',
+    noPromotionsHint:
+      '現在キャンペーンはありません。カードにキャンペーンを追加して還元率をアップしましょう。',
+    noCardsForPromo: 'キャンペーンを設定・追跡するには、先にカードを追加してください。',
+    selectCardForPromo: 'キャンペーンを適用するカードを選択',
     choosePreset: '人気カードから選ぶ',
     popularPresets: '人気カード',
     baseRateBadge: '基本 %{rate}%',

@@ -2,6 +2,13 @@
 
 ## 2026-09-09
 - Date: 2026-09-09
+- Description: **Add & Manage Card Promotions Directly from PaymentCardsScreen** — Promotions tab now supports 1-tap add/edit of bank promotions via shared `PromoEditorModal`, multi-card `CardPickerForPromoModal`, upgraded empty state, and mode-aware primary CTA (Add promotion vs Add a card).
+- Affected modules: View (`PaymentCardsScreen.tsx`, `CreditCardEditScreen.tsx`, `PromoEditorModal.tsx`, `CardPickerForPromoModal.tsx`); i18n (`en.ts`, `zh-Hant.ts`, `zh-Hans.ts`, `ja.ts`); CHANGELOG
+- Reason: UX/UI — allow 1-tap promotion addition and card selection from Promotions tab
+- Impact: Medium
+
+## 2026-09-09
+- Date: 2026-09-09
 - Description: **Fix Metro Bundler Warning for `@noble/hashes/crypto.js`** — Resolved Metro bundler warnings caused by `@noble/hashes` exporting only `"./crypto"` instead of `"./crypto.js"`. Added `scripts/patch-noble-hashes.js` automated via `npm run postinstall` to add `"./crypto.js"` to `package.json:exports` (matching `@noble/ciphers`), and added standard `metro.config.js` configuration in `privateLifeManagementApp`.
 - Affected modules: Tooling & Scripts (`scripts/patch-noble-hashes.js`, `package.json`, `metro.config.js`); CHANGELOG
 - Reason: Bug fix — eliminate noisy Metro bundler warnings and ensure smooth module resolution
