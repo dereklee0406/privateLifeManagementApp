@@ -30,7 +30,7 @@ import { TextSizeSelector } from '../components/TextSizeSelector';
 import { useI18n } from '../i18n';
 import type { TypeIconName } from '../icons/typeIcons';
 import { useThemeColors } from '../theme/ThemeProvider';
-import { insetSurface } from '../theme/tokens';
+import { fonts, insetSurface, raisedSurface } from '../theme/tokens';
 import { tabScenePaddingBottom, type } from '../theme/typography';
 
 function cardFeeChipLabel(rate: 0 | 0.015 | 0.02 | 0.03, t: (key: string) => string): string {
@@ -78,7 +78,7 @@ function languageLabel(id: LanguagePreference, t: (key: string) => string): stri
 /**
  * Purpose: profile, look, language, preferences, catalogs, money, lock, backup, and privacy.
  * Inputs: settings and finance (to resolve the extra-tools default).
- * Outputs: iOS inset-grouped Settings form (Halo clay cards).
+ * Outputs: editorial header + iOS inset-grouped Settings form (Halo clay cards).
  * Side effects: persists preference changes; rename confirm on blur.
  * Design decisions: no “This week” dump (lives on Today). Profile avatar card leads; manage rows
  *   use disclosure chevrons; privacy + version close the page.
@@ -109,7 +109,27 @@ export function SettingsScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        <LargeTitle title={t('you.title')} />
+        <View style={styles.topRow}>
+          <View style={styles.titleBlock}>
+            <Text style={[type.footnote, styles.headerKicker, { color: colors.accent }]}>
+              {t('you.headerKicker')}
+            </Text>
+            <LargeTitle title={t('you.headerTitle')} />
+          </View>
+          <View
+            style={[raisedSurface(colors, 14), styles.privacyBadge]}
+            accessibilityRole="image"
+            accessibilityLabel={t('you.headerKicker')}
+          >
+            <Ionicons
+              name="shield-checkmark-outline"
+              size={20}
+              color={colors.accent}
+              accessible={false}
+              importantForAccessibility="no"
+            />
+          </View>
+        </View>
         <Text style={[type.subhead, { color: colors.muted }]}>
           {t('you.stays', { name: AppConfig.productName })}
         </Text>
@@ -281,6 +301,29 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: 20,
     gap: 18,
+  },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  titleBlock: {
+    flex: 1,
+    minWidth: 0,
+  },
+  headerKicker: {
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: 2,
+    fontFamily: fonts.bodySemi,
+  },
+  privacyBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   profileRow: {
     flexDirection: 'row',

@@ -175,9 +175,6 @@ export function SubscriptionsCockpitScreen() {
           <EmptyState
             message={t('subscriptions.emptyStateHint')}
             backdropIcon="repeat-outline"
-            actionLabel={t('subscriptions.addSubscription')}
-            actionIcon="add"
-            onAction={goAdd}
           />
         ) : (
           <>
@@ -246,11 +243,12 @@ export function SubscriptionsCockpitScreen() {
                           disabled={Boolean(loggingId)}
                           accessibilityRole="button"
                           accessibilityLabel={t('subscriptions.logTodayCharge')}
-                          style={[
+                          style={({ pressed }) => [
                             styles.logBtn,
                             {
                               backgroundColor: colors.accentSoft,
-                              opacity: busy ? 0.55 : 1,
+                              opacity: busy ? 0.55 : pressed ? 0.8 : 1,
+                              transform: [{ scale: pressed && !busy ? 0.96 : 1 }],
                             },
                           ]}
                         >

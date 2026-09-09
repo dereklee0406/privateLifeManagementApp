@@ -49,7 +49,14 @@ export function PrimaryButton({
         void hapticLight();
         onPress?.(event);
       }}
-      style={[raisedAccent(colors, 22), styles.button, { opacity: blocked ? 0.45 : 1 }]}
+      style={({ pressed }) => [
+        raisedAccent(colors, 22),
+        styles.button,
+        {
+          opacity: blocked ? 0.45 : pressed ? 0.92 : 1,
+          transform: [{ scale: pressed && !blocked ? 0.985 : 1 }],
+        },
+      ]}
     >
       <View style={styles.row}>
         {busy ? (

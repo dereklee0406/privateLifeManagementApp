@@ -29,7 +29,12 @@ export function TextButton({ label, tone = 'accent', disabled, onPress, ...rest 
         onPress?.(event);
       }}
       accessibilityRole="button"
-      style={[styles.hit, { opacity: disabled ? 0.4 : 1 }]}
+      style={({ pressed }) => [
+        styles.hit,
+        {
+          opacity: disabled ? 0.4 : pressed ? 0.6 : 1,
+        },
+      ]}
     >
       <Text style={[type.headline, { color }]}>{label}</Text>
     </Pressable>

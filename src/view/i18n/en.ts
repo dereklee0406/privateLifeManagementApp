@@ -100,6 +100,8 @@ export const en = {
   },
   pages: {
     title: 'Pages',
+    headerKicker: 'TIMELINE & JOURNAL',
+    headerTitle: 'Journal',
     reminders: 'Reminders',
     money: 'Money',
     emptySearch: 'Nothing matches that. Try a simpler word, or write a new page.',
@@ -125,6 +127,9 @@ export const en = {
   },
   calendar: {
     title: 'Calendar',
+    headerKicker: 'SCHEDULE & RHYTHM',
+    headerTitle: 'Schedule',
+    jumpToday: 'Jump to today',
     views: 'Views · %{view}',
     monthly: 'Monthly',
     timeline: 'Timeline',
@@ -140,6 +145,8 @@ export const en = {
   },
   money: {
     title: 'Money',
+    headerKicker: 'FINANCES & WALLET',
+    headerTitle: 'Overview',
     lede: 'This month, on your phone.',
     spentThisMonth: 'Spent this month',
     addSpend: 'Add a spend',
@@ -402,6 +409,8 @@ export const en = {
   },
   you: {
     title: 'Settings',
+    headerKicker: 'ON-DEVICE PRIVACY',
+    headerTitle: 'Settings',
     stays: '%{name} stays on this phone. Nothing is uploaded.',
     thisWeek: 'This week',
     journal: 'Journal · %{line}',
@@ -822,6 +831,9 @@ export const en = {
     templateLunch: 'Lunch',
     templateMTR: 'MTR',
     customAmount: 'Custom amount',
+    quickModeInstant: '1-Tap & Voice',
+    quickModeKeypad: 'Custom Keypad',
+    logAmount: 'Log %{amount}',
     voiceNeedAmount: 'Add an amount — try "Coffee 35".',
   },
   split: {

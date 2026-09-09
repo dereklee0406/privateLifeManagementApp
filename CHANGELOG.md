@@ -2,6 +2,48 @@
 
 ## 2026-09-09
 - Date: 2026-09-09
+- Description: **Root Tab Editorial Headers** — Replaced plain one-word tab titles (`Pages`, `Calendar`, `Money`, `You`/`Settings`) with a cohesive editorial lockup matching Home: accented kicker + hero `LargeTitle` + tactile 44pt circular action/status. Journal gains a write (`create-outline`) shortcut to `/compose?mode=text`; Calendar uses dynamic `month.heading` with jump-to-today (`today-outline` + haptic); Money opens Quick Spend (`flash-outline`); Settings shows an on-device privacy shield badge. New i18n keys with 100% parity across `en`, `zh-Hant`, `zh-Hans`, `ja`.
+- Affected modules: View (`JournalScreen.tsx`, `CalendarScreen.tsx`, `MoneyScreen.tsx`, `SettingsScreen.tsx`); i18n (`en.ts`, `zh-Hant.ts`, `zh-Hans.ts`, `ja.ts`); CHANGELOG
+- Reason: UX/UI Enhancement — remove generic tab-label headers and align all primary tabs with Home’s editorial date lockup system
+- Impact: Medium
+
+## 2026-09-09
+- Date: 2026-09-09
+- Description: **Home Screen Header Editorial Refinement** — Streamlined and elevated the Home screen header: (1) Replaced the redundant "Today" title and generic "Good evening, Writer" subtitle with an elegant, iOS Calendar-style date lockup featuring an accented weekday kicker (`WEDNESDAY`) paired with a hero `LargeTitle` date heading (`September 9`); (2) Upgraded the global journal search trigger into a tactile neumorphic circular action button (`searchButton`, size 44pt, radius 22, micro-scale `0.94` on press); (3) Added `formatHeaderDate` pure helper in `dateUtils.ts` with full Intl localization; (4) Eliminated visual clutter and vertical dead space before the primary action capsule.
+- Affected modules: View (`HomeScreen.tsx`); Utils (`dateUtils.ts`); CHANGELOG
+- Reason: UX/UI Enhancement — remove generic placeholder greeting, eliminate redundant header copy, and align with iOS HIG editorial date typography
+- Impact: Low
+
+## 2026-09-09
+- Date: 2026-09-09
+- Description: **Quick Spend Sheet UX/UI Enhancement** — Restructured `QuickSpendSheet` from a single vertically stacked scroll into a two-mode neumorphic segmented control: (1) **1-Tap & Voice** — Smart Suggestion hero, One-Tap Templates grid, deduplicated Recent Spends strip (icon + title + amount), and Voice Quick Add; (2) **Custom Keypad** — right-aligned amount well with currency + category pill + Clear, labeled category chips (`leadingIcon` + text), compact 3×4 tactile keypad (raised→inset, scale 0.96), and sticky bottom `PrimaryButton` Log CTA that stays on-screen (`Log %{amount}` when ready). Added `spend.quickModeInstant`, `spend.quickModeKeypad`, `spend.logAmount` across all 4 locales.
+- Affected modules: View (`QuickSpendSheet.tsx`); i18n (`en.ts`, `zh-Hant.ts`, `zh-Hans.ts`, `ja.ts`); CHANGELOG
+- Reason: UX/UI Polish — eliminate vertical bloat, keep primary Log CTA visible, improve amount well balance and category discoverability
+- Impact: Medium
+
+## 2026-09-09
+- Date: 2026-09-09
+- Description: **Deprecate `props.pointerEvents` in favor of `style.pointerEvents`** — Migrated all legacy JSX element-level `pointerEvents` props to modern `style.pointerEvents` across Web and Native: (1) `DayOfMonthStepper.tsx` (ordinal text); (2) `DateField.web.tsx` (formatted date display text); (3) `FloatingTabBar.tsx` (floating bar container `styles.wrap`); (4) `PhotoReelViewer.tsx` (`taps`, `top`, and `bottom` overlays); (5) `AmbientBackground.web.tsx` & `AmbientBackground.native.tsx` (background wash layer). Eliminates React Native Web console deprecation warning `props.pointerEvents is deprecated. Use style.pointerEvents` and adheres to modern React Native / CSS pointer-events standards.
+- Affected modules: View (`DayOfMonthStepper.tsx`, `DateField.web.tsx`, `FloatingTabBar.tsx`, `PhotoReelViewer.tsx`, `AmbientBackground.web.tsx`, `AmbientBackground.native.tsx`); CHANGELOG
+- Reason: Web / React Native Deprecation Cleanup — migrate from legacy `props.pointerEvents` to modern `style.pointerEvents`
+- Impact: Low
+
+## 2026-09-09
+- Date: 2026-09-09
+- Description: **Fix React DOM validateDOMNesting: Nested `<button>` in AmountCalculatorField** — Resolved invalid HTML DOM hierarchy (`<button> cannot contain a nested <button>`) on Web. Refactored `AmountCalculatorField` amount well: replaced the outer `Pressable accessibilityRole="button"` container with a neutral `<View>` container, and separated its child interactions into discrete sibling controls: (1) independent clear action (`Pressable accessibilityRole="button"`), (2) interactive edit pill toggle (`Pressable accessibilityRole="button"`), and (3) interactive amount display area (`Pressable accessibilityRole="button"`). Added tactile active press states (`opacity: 0.6` / `0.75` / `0.85`) across all three controls. Eliminates React DOM nesting warnings and prevents event propagation collisions between clearing and expanding.
+- Affected modules: View (`AmountCalculatorField.tsx`); CHANGELOG
+- Reason: Web / React DOM Bug Fix — eliminate HTML invalid nesting error when rendering React Native Web buttons
+- Impact: Low
+
+## 2026-09-09
+- Date: 2026-09-09
+- Description: **Button Tactile Design System & UX/UI Polish** — Comprehensive review and polish of buttons across the app: (1) Added native micro-scale depression and opacity feedback on active press across design system controls (`PrimaryButton` scale 0.985/0.92, `SectionActionButton` scale 0.97/0.85, `TextButton` opacity 0.6, `Chip` scale 0.97/0.85); (2) Removed duplicate CTA buttons in `SubscriptionsCockpitScreen` empty state and added tactile press states on 1-tap renewal log buttons; (3) Added active depression feedback on 1-tap habit check-in buttons in `HabitStreaksScreen`; (4) Refactored navigation entry hierarchy by extracting `Transfer` & `Subscriptions` on `MoneyScreen` and `Habit Streaks` on `RemindersScreen` into dedicated `SectionActionButton` quick action rows separate from logging/filtering chips; (5) Resolved duplicate TypeScript import in `SubscriptionsCockpitScreen.tsx`.
+- Affected modules: View (`PrimaryButton.tsx`, `SectionActionButton.tsx`, `TextButton.tsx`, `Chip.tsx`, `SubscriptionsCockpitScreen.tsx`, `HabitStreaksScreen.tsx`, `MoneyScreen.tsx`, `RemindersScreen.tsx`); CHANGELOG
+- Reason: UX/UI Polish — physical touch feedback, clean visual navigation hierarchy, and eradication of competing empty-state buttons
+- Impact: Medium
+
+## 2026-09-09
+- Date: 2026-09-09
 - Description: **Subscriptions Cockpit & Habit Consistency Heatmap** — Implemented two core privacy life management pillars: (1) **Subscriptions & Recurring Contract Cockpit** (`subscriptionCockpit.ts`, `SubscriptionsCockpitScreen.tsx`, route `app/subscriptions.tsx`) providing monthly burn rate, annual projections, upcoming 14-day renewal countdowns with 1-tap spend logging, paying credit card allocation, and category breakdowns; (2) **Habit Streaks & Consistency Heatmap** (`habitStreaks.ts`, `HabitStreaksScreen.tsx`, route `app/habits.tsx`) providing 90-day tactile rhythm matrix (7×13 grid), filterable All Habits vs single-habit density views, flame streak badges (`🔥 14 days`), best streak records, 30-day consistency analytics, and 1-tap check-in toggles; (3) **Navigation & i18n Integration** with registered routes in `app/_layout.tsx`, navigation entry chips in `MoneyScreen.tsx` and `RemindersScreen.tsx`, and 31 new localized strings with 100% key parity across `en.ts`, `zh-Hant.ts`, `zh-Hans.ts`, and `ja.ts`.
 - Affected modules: Model (`subscriptionCockpit.ts`, `subscriptionCockpit.test.ts`, `habitStreaks.ts`, `habitStreaks.test.ts`); View (`SubscriptionsCockpitScreen.tsx`, `HabitStreaksScreen.tsx`, `MoneyScreen.tsx`, `RemindersScreen.tsx`); Routes (`app/subscriptions.tsx`, `app/habits.tsx`, `app/_layout.tsx`); i18n (`en.ts`, `zh-Hant.ts`, `zh-Hans.ts`, `ja.ts`); CHANGELOG
 - Reason: Feature Implementation — deliver privacy-first personal subscriptions management and habit consistency tracking with 100% on-device data sovereignty

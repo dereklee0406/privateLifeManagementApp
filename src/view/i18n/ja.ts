@@ -102,6 +102,8 @@ export const ja: TranslationCatalog = {
   },
   pages: {
     title: '日記',
+    headerKicker: 'タイムライン・記録',
+    headerTitle: 'ジャーナル',
     reminders: 'リマインダー',
     money: 'お金',
     emptySearch: '見つからないよ。短い言葉で試すか、新しいページを。',
@@ -127,6 +129,9 @@ export const ja: TranslationCatalog = {
   },
   calendar: {
     title: 'カレンダー',
+    headerKicker: 'スケジュール・習慣',
+    headerTitle: '予定表',
+    jumpToday: '今日に戻る',
     views: '表示 · %{view}',
     monthly: '月',
     timeline: 'タイムライン',
@@ -142,6 +147,8 @@ export const ja: TranslationCatalog = {
   },
   money: {
     title: 'お金',
+    headerKicker: '家計・資産管理',
+    headerTitle: '収支概要',
     lede: '今月、このスマホの中。',
     spentThisMonth: '今月使った額',
     addSpend: '支出を追加',
@@ -404,6 +411,8 @@ export const ja: TranslationCatalog = {
   },
   you: {
     title: '設定',
+    headerKicker: 'オンデバイス・プライバシー',
+    headerTitle: '設定とセキュリティ',
     stays: '%{name} はこのスマホの中。アップロードしません。',
     thisWeek: '今週',
     journal: '日記 · %{line}',
@@ -821,6 +830,9 @@ export const ja: TranslationCatalog = {
     templateLunch: 'ランチ',
     templateMTR: 'MTR',
     customAmount: '金額を入力',
+    quickModeInstant: 'ワンタップ・音声',
+    quickModeKeypad: 'カスタムキーパッド',
+    logAmount: '%{amount}を記録',
     voiceNeedAmount: '金額が必要です — 例：「コーヒー 35」',
   },
   split: {

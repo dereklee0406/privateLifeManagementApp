@@ -13,6 +13,7 @@ import { formatExpenseSpendLine } from '../../model/finance/fx';
 import { remindersOnDay } from '../../model/reminders/grouping';
 import { toDayKey } from '../../utils/dateUtils';
 import { appHref } from '../../utils/navigation';
+import { hapticLight } from '../../utils/haptics';
 import { useI18n } from '../i18n';
 import { Chip } from '../components/Chip';
 import { EmptyState } from '../components/EmptyState';
@@ -30,7 +31,7 @@ import {
 } from '../icons/typeIcons';
 import { useThemeColors } from '../theme/ThemeProvider';
 import { fonts, groupedRadius, raisedSurface } from '../theme/tokens';
-import { tabScenePaddingBottom } from '../theme/typography';
+import { tabScenePaddingBottom, type } from '../theme/typography';
 
 type CalView = 'month' | 'timeline';
 
@@ -39,8 +40,9 @@ const PRIORITY_RANK: Record<string, number> = { urgent: 3, high: 2, normal: 1, l
 /**
  * Purpose: one Calendar tab for life events and money due dates.
  * Inputs: journal, reminders, expenses.
- * Outputs: view switcher — monthly grid, reminder agenda, journal day, timeline, money.
- * Side effects: navigation to compose, reminder, or spend — each as its own add, not a mixed form.
+ * Outputs: editorial month lockup, view switcher — monthly grid, reminder agenda, journal day, timeline, money.
+ * Side effects: navigation to compose, reminder, or spend — each as its own add, not a mixed form;
+ *   jump-to-today resets cursor + selected day.
  */
 export function CalendarScreen() {
   const colors = useThemeColors();
@@ -95,13 +97,41 @@ export function CalendarScreen() {
     return { color, typeId: iconIdForReminder(top.reminder.categoryPath, top.reminder.templateId) };
   };
 
+  const jumpToToday = () => {
+    void hapticLight();
+    setCursor({ year: now.getFullYear(), month: now.getMonth() });
+    setSelectedDay(todayKey);
+  };
+
   return (
     <ScreenScaffold>
       <ScrollView
         contentContainerStyle={[styles.content, { paddingTop: insets.top + 8, paddingBottom: tabScenePaddingBottom(insets.bottom) }]}
         showsVerticalScrollIndicator={false}
       >
-        <LargeTitle title={t('calendar.title')} />
+        <View style={styles.topRow}>
+          <View style={styles.titleBlock}>
+            <Text style={[type.footnote, styles.headerKicker, { color: colors.accent }]}>
+              {t('calendar.headerKicker')}
+            </Text>
+            <LargeTitle title={month.heading} />
+          </View>
+          <Pressable
+            onPress={jumpToToday}
+            style={({ pressed }) => [
+              raisedSurface(colors, 14),
+              styles.todayButton,
+              {
+                transform: [{ scale: pressed ? 0.94 : 1 }],
+                opacity: pressed ? 0.8 : 1,
+              },
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel={t('calendar.jumpToday')}
+          >
+            <Ionicons name="today-outline" size={20} color={colors.ink} accessible={false} importantForAccessibility="no" />
+          </Pressable>
+        </View>
         <ViewsSwitcher view={view} onChange={setView} />
 
         {insights.streakDays > 0 ? (
@@ -365,6 +395,29 @@ function QuickActionChip({
 
 const styles = StyleSheet.create({
   content: { paddingHorizontal: 20, gap: 10 },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  titleBlock: {
+    flex: 1,
+    minWidth: 0,
+  },
+  headerKicker: {
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: 2,
+    fontFamily: fonts.bodySemi,
+  },
+  todayButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   viewsBar: { flexDirection: 'row', gap: 8, marginBottom: 4 },
   streakLine: { fontFamily: fonts.body, fontSize: 14, marginBottom: 4 },
   empty: { fontFamily: fonts.body, fontSize: 15, marginTop: 4 },

@@ -52,10 +52,14 @@ export function SectionActionButton({
         void hapticLight();
         onPress?.(event);
       }}
-      style={[
+      style={({ pressed }) => [
         raisedSurface(colors, 14),
         styles.hit,
-        { backgroundColor: fill, opacity: disabled ? 0.4 : 1 },
+        {
+          backgroundColor: fill,
+          opacity: disabled ? 0.4 : pressed ? 0.85 : 1,
+          transform: [{ scale: pressed && !disabled ? 0.97 : 1 }],
+        },
         style,
       ]}
     >

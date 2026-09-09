@@ -203,10 +203,7 @@ export function PhotoReelViewer({ photos, startIndex, onClose, onOpenPage }: Pho
         />
       )}
 
-      <View
-        style={[styles.taps, { top: insets.top + 52, bottom: insets.bottom + 96 }]}
-        pointerEvents="box-none"
-      >
+      <View style={[styles.taps, { top: insets.top + 52, bottom: insets.bottom + 96 }]}>
         <Pressable
           style={styles.tapPrev}
           onPress={() => goDelta(-1)}
@@ -221,14 +218,14 @@ export function PhotoReelViewer({ photos, startIndex, onClose, onOpenPage }: Pho
         />
       </View>
 
-      <View style={[styles.top, { paddingTop: insets.top + 8 }]} pointerEvents="box-none">
+      <View style={[styles.top, { paddingTop: insets.top + 8 }]}>
         <BackButton onPress={onClose} />
         <Text style={[type.subhead, styles.progress, { color: colors.muted }]}>
           {t('photos.progress', { current: index + 1, total: photos.length })}
         </Text>
       </View>
 
-      <View style={[styles.bottom, { paddingBottom: insets.bottom + 16 }]} pointerEvents="box-none">
+      <View style={[styles.bottom, { paddingBottom: insets.bottom + 16 }]}>
         <Text style={[type.headline, { color: colors.ink }]} numberOfLines={3}>
           {caption}
         </Text>
@@ -267,6 +264,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     flexDirection: 'row',
+    pointerEvents: 'box-none',
   },
   tapPrev: {
     flex: 0.35,
@@ -283,6 +281,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    pointerEvents: 'box-none',
   },
   progress: {
     marginLeft: 12,
@@ -294,5 +293,6 @@ const styles = StyleSheet.create({
     bottom: 0,
     gap: 4,
     alignItems: 'flex-start',
+    pointerEvents: 'box-none',
   },
 });

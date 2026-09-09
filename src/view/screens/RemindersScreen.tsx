@@ -16,6 +16,7 @@ import { hapticSuccess } from '../../utils/haptics';
 import { Chip } from '../components/Chip';
 import { EmptyState } from '../components/EmptyState';
 import { GroupedRow, GroupedSection } from '../components/GroupedList';
+import { SectionActionButton } from '../components/SectionActionButton';
 import { TypeIcon } from '../components/TypeIcon';
 import { ScreenHeader } from '../components/ScreenHeader';
 import { ScreenScaffold } from '../components/ScreenScaffold';
@@ -119,13 +120,14 @@ export function RemindersScreen() {
           </Text>
         ) : null}
 
-        <View style={styles.filters}>
-          <Chip
+        <View style={styles.quickActionRow}>
+          <SectionActionButton
             icon="flame-outline"
             label={t('habits.streaksTitle')}
-            selected={false}
             onPress={() => router.push('/habits')}
           />
+        </View>
+        <View style={styles.filters}>
           <Chip label={t('common.all')} selected={top === 'all'} onPress={() => setTop('all')} />
           {topCategories.map((node) => (
             <Chip
@@ -232,6 +234,7 @@ export function RemindersScreen() {
 
 const styles = StyleSheet.create({
   content: { paddingHorizontal: 20, gap: 14 },
+  quickActionRow: { flexDirection: 'row', gap: 10, marginBottom: 8 },
   filters: {
     flexDirection: 'row',
     flexWrap: 'wrap',

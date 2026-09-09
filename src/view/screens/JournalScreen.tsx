@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFinance } from '../../controller/FinanceProvider';
@@ -8,6 +9,7 @@ import { useReminders } from '../../controller/ReminderProvider';
 import { emptySearchInput } from '../../model/journal/journalSearch';
 import { browseGlobalKind, searchGlobal, type GlobalSearchFilter, type GlobalSearchHit } from '../../model/search/globalSearch';
 import { appHref } from '../../utils/navigation';
+import { hapticLight } from '../../utils/haptics';
 import { Chip } from '../components/Chip';
 import { useI18n } from '../i18n';
 import { EmptyState } from '../components/EmptyState';
@@ -18,7 +20,9 @@ import { ScreenScaffold } from '../components/ScreenScaffold';
 import { SearchFilters } from '../components/SearchFilters';
 import { TypeIcon } from '../components/TypeIcon';
 import { iconIdForReminder, type TypeIconName } from '../icons/typeIcons';
-import { tabScenePaddingBottom } from '../theme/typography';
+import { useThemeColors } from '../theme/ThemeProvider';
+import { fonts, raisedSurface } from '../theme/tokens';
+import { tabScenePaddingBottom, type } from '../theme/typography';
 
 const KIND_CHIPS: Array<{ id: GlobalSearchFilter; label: string; icon: TypeIconName }> = [
   { id: 'all', label: 'All', icon: 'apps-outline' },
@@ -30,10 +34,11 @@ const KIND_CHIPS: Array<{ id: GlobalSearchFilter; label: string; icon: TypeIconN
 /**
  * Purpose: Pages timeline plus one global search over pages, reminders, and spends.
  * Inputs: journal, reminders, finance; local filter form state.
- * Outputs: timeline when All/Pages is idle; mixed hits when she types or picks Reminders/Money.
- * Side effects: navigation only. Filtering lives in Model. Spend hits open that spend to edit.
+ * Outputs: editorial header, timeline when All/Pages is idle; mixed hits when she types or picks Reminders/Money.
+ * Side effects: navigation only (compose for write). Filtering lives in Model. Spend hits open that spend to edit.
  */
 export function JournalScreen() {
+  const colors = useThemeColors();
   const { t } = useI18n();
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -97,7 +102,32 @@ export function JournalScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <LargeTitle title={t('pages.title')} />
+        <View style={styles.topRow}>
+          <View style={styles.titleBlock}>
+            <Text style={[type.footnote, styles.headerKicker, { color: colors.accent }]}>
+              {t('pages.headerKicker')}
+            </Text>
+            <LargeTitle title={t('pages.headerTitle')} />
+          </View>
+          <Pressable
+            onPress={() => {
+              void hapticLight();
+              router.push('/compose?mode=text');
+            }}
+            style={({ pressed }) => [
+              raisedSurface(colors, 14),
+              styles.newButton,
+              {
+                transform: [{ scale: pressed ? 0.94 : 1 }],
+                opacity: pressed ? 0.8 : 1,
+              },
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel={t('pages.writePage')}
+          >
+            <Ionicons name="create-outline" size={20} color={colors.ink} accessible={false} importantForAccessibility="no" />
+          </Pressable>
+        </View>
         <View style={styles.kinds}>
           {KIND_CHIPS.map((item) => (
             <Chip
@@ -182,6 +212,29 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: 20,
     gap: 12,
+  },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  titleBlock: {
+    flex: 1,
+    minWidth: 0,
+  },
+  headerKicker: {
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: 2,
+    fontFamily: fonts.bodySemi,
+  },
+  newButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   kinds: {
     flexDirection: 'row',

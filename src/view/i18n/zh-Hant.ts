@@ -102,6 +102,8 @@ export const zhHant: TranslationCatalog = {
   },
   pages: {
     title: '日記',
+    headerKicker: '時間軸與日誌',
+    headerTitle: '生活日誌',
     reminders: '提醒',
     money: '錢',
     emptySearch: '沒有符合的。試下簡單啲的字，或寫新的一頁。',
@@ -127,6 +129,9 @@ export const zhHant: TranslationCatalog = {
   },
   calendar: {
     title: '日曆',
+    headerKicker: '日程與節奏',
+    headerTitle: '日程表',
+    jumpToday: '回到今天',
     views: '檢視 · %{view}',
     monthly: '每月',
     timeline: '時間線',
@@ -142,6 +147,8 @@ export const zhHant: TranslationCatalog = {
   },
   money: {
     title: '錢',
+    headerKicker: '財務與錢包',
+    headerTitle: '收支總覽',
     lede: '這個月，在你手機上。',
     spentThisMonth: '本月已花',
     addSpend: '記一筆',
@@ -403,6 +410,8 @@ export const zhHant: TranslationCatalog = {
   },
   you: {
     title: '設定',
+    headerKicker: '本機隱私保護',
+    headerTitle: '設定與安全',
     stays: '%{name} 留在這部手機。不會上傳。',
     thisWeek: '本週',
     journal: '日記 · %{line}',
@@ -820,6 +829,9 @@ export const zhHant: TranslationCatalog = {
     templateLunch: '午餐',
     templateMTR: '港鐵',
     customAmount: '自訂金額',
+    quickModeInstant: '一鍵與語音',
+    quickModeKeypad: '自訂鍵盤',
+    logAmount: '記錄 %{amount}',
     voiceNeedAmount: '請加上金額 — 例如「咖啡 35」。',
   },
   split: {

@@ -233,14 +233,7 @@ export function AmountCalculatorField({
         })}
       </View>
 
-      <Pressable
-        onPress={toggleKeypad}
-        accessibilityRole="button"
-        accessibilityLabel={wellA11yLabel}
-        accessibilityState={{ expanded: !keypadCollapsed }}
-        accessibilityHint={keypadCollapsed ? t('spend.showKeypad') : t('spend.hideKeypad')}
-        style={[insetSurface(colors, 20), styles.well]}
-      >
+      <View style={[insetSurface(colors, 20), styles.well]}>
         <View style={styles.wellTop}>
           <Text
             style={[styles.currencyBadge, { color: colors.muted, fontSize: currencyLabelSize }]}
@@ -252,27 +245,29 @@ export function AmountCalculatorField({
           <View style={styles.wellActions}>
             {!empty ? (
               <Pressable
-                onPress={(e) => {
-                  e?.stopPropagation?.();
-                  clearAmount();
-                }}
+                onPress={clearAmount}
                 accessibilityRole="button"
                 accessibilityLabel={t('spend.clear')}
                 hitSlop={8}
-                style={styles.wellAction}
+                style={({ pressed }) => [styles.wellAction, { opacity: pressed ? 0.6 : 1 }]}
               >
                 <Ionicons name="close-circle-outline" size={wellActionIconSize} color={colors.muted} />
               </Pressable>
             ) : null}
-            <View
-              style={[
+            <Pressable
+              onPress={toggleKeypad}
+              accessibilityRole="button"
+              accessibilityLabel={keypadCollapsed ? t('spend.showKeypad') : t('spend.hideKeypad')}
+              accessibilityState={{ expanded: !keypadCollapsed }}
+              hitSlop={6}
+              style={({ pressed }) => [
                 styles.editPill,
                 {
                   backgroundColor: keypadCollapsed ? colors.accentSoft : colors.surface,
                   borderColor: keypadCollapsed ? colors.accent : colors.glassBorder,
+                  opacity: pressed ? 0.75 : 1,
                 },
               ]}
-              importantForAccessibility="no"
             >
               <Ionicons
                 name={keypadCollapsed ? 'chevron-down' : 'chevron-up'}
@@ -292,36 +287,46 @@ export function AmountCalculatorField({
               >
                 {keypadCollapsed ? t('spend.tapToEdit') : t('spend.done')}
               </Text>
-            </View>
+            </Pressable>
           </View>
         </View>
-        <Text
-          accessible={false}
-          style={[
-            styles.amount,
-            {
-              color: empty ? colors.faint : colors.ink,
-              fontSize: amountSize,
-              lineHeight: Math.round(amountSize * 1.15),
-            },
-          ]}
-          numberOfLines={1}
-          adjustsFontSizeToFit
-          minimumFontScale={0.55}
-          selectable={false}
+
+        <Pressable
+          onPress={toggleKeypad}
+          accessibilityRole="button"
+          accessibilityLabel={wellA11yLabel}
+          accessibilityState={{ expanded: !keypadCollapsed }}
+          accessibilityHint={keypadCollapsed ? t('spend.showKeypad') : t('spend.hideKeypad')}
+          style={({ pressed }) => [styles.amountHit, { opacity: pressed ? 0.85 : 1 }]}
         >
-          {empty ? '0' : expression}
-        </Text>
-        {preview ? (
           <Text
-            style={[styles.preview, { color: colors.muted, fontSize: previewSize, lineHeight: Math.round(previewSize * 1.35) }]}
+            accessible={false}
+            style={[
+              styles.amount,
+              {
+                color: empty ? colors.faint : colors.ink,
+                fontSize: amountSize,
+                lineHeight: Math.round(amountSize * 1.15),
+              },
+            ]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.55}
             selectable={false}
-            importantForAccessibility="no"
           >
-            = {preview}
+            {empty ? '0' : expression}
           </Text>
-        ) : null}
-      </Pressable>
+          {preview ? (
+            <Text
+              style={[styles.preview, { color: colors.muted, fontSize: previewSize, lineHeight: Math.round(previewSize * 1.35) }]}
+              selectable={false}
+              importantForAccessibility="no"
+            >
+              = {preview}
+            </Text>
+          ) : null}
+        </Pressable>
+      </View>
 
       {!keypadCollapsed ? (
         <View style={styles.pad}>
@@ -527,6 +532,12 @@ const styles = StyleSheet.create({
   },
   amount: { fontFamily: fonts.display, fontWeight: '700', textAlign: 'right' },
   preview: { fontFamily: fonts.bodyMedium, marginTop: 2, textAlign: 'right' },
+  amountHit: {
+    width: '100%',
+    paddingVertical: 2,
+    alignItems: 'stretch',
+    justifyContent: 'center',
+  },
   pad: { gap: 6, width: '100%' },
   padToolbar: {
     flexDirection: 'row',

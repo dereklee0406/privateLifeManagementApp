@@ -39,7 +39,7 @@ export function DateField({ label, value, onChange, display = 'date' }: DateFiel
         {label}
       </Text>
       <View style={[insetSurface(colors, 16), styles.well]}>
-        <Text style={[styles.value, { color: colors.ink }]} pointerEvents="none" numberOfLines={2}>
+        <Text style={[styles.value, { color: colors.ink, pointerEvents: 'none' }]} numberOfLines={2}>
           {formatDateFieldValue(value, display, intlLocale)}
         </Text>
         {createElement('input', {

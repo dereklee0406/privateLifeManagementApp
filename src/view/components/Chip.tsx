@@ -57,7 +57,16 @@ export function Chip({
     accessibilityRole: 'button',
     accessibilityLabel: label,
     accessibilityState: { selected },
-    style: [chipSurface(colors, selected), styles.chip, icon ? styles.iconChip : null, style],
+    style: ({ pressed }) => [
+      chipSurface(colors, selected),
+      styles.chip,
+      icon ? styles.iconChip : null,
+      {
+        opacity: pressed ? 0.85 : 1,
+        transform: [{ scale: pressed ? 0.97 : 1 }],
+      },
+      style,
+    ],
   };
   if (Platform.OS === 'web') {
     pressableProps.title = label;

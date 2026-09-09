@@ -217,13 +217,15 @@ export function HabitStreaksScreen() {
                             ? t('habits.completed')
                             : t('habits.markCompleted')
                         }
-                        style={[
+                        style={({ pressed }) => [
                           styles.checkInBtn,
                           {
                             backgroundColor: streak.isCompletedToday
                               ? colors.accent
                               : colors.accentSoft,
                             borderColor: colors.accent,
+                            opacity: pressed ? 0.85 : 1,
+                            transform: [{ scale: pressed ? 0.95 : 1 }],
                           },
                         ]}
                       >

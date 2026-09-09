@@ -15,16 +15,15 @@ export function AmbientBackground() {
   const reduceMotion = useReduceMotion();
 
   if (reduceMotion) {
-    return <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: colors.paper }]} />;
+    return <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.paper, pointerEvents: 'none' }]} />;
   }
 
   return (
     <LinearGradient
-      pointerEvents="none"
       colors={[colors.washTop, colors.paper, colors.washBottom]}
       start={{ x: 0.15, y: 0 }}
       end={{ x: 0.85, y: 1 }}
-      style={StyleSheet.absoluteFill}
+      style={[StyleSheet.absoluteFill, { pointerEvents: 'none' }]}
     />
   );
 }

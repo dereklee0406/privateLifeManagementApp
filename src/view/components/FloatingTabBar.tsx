@@ -55,7 +55,7 @@ export function FloatingTabBar({ state, navigation }: FloatingTabBarProps) {
   const { t } = useI18n();
 
   return (
-    <View pointerEvents="box-none" style={styles.wrap}>
+    <View style={styles.wrap}>
       <GlassSurface
         style={[
           styles.bar,
@@ -123,6 +123,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
+    pointerEvents: 'box-none',
   },
   bar: {
     paddingTop: 6,

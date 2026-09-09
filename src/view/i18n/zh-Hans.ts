@@ -103,6 +103,8 @@ export const zhHans: TranslationCatalog = {
   },
   pages: {
     title: '日记',
+    headerKicker: '时间轴与日志',
+    headerTitle: '生活日志',
     reminders: '提醒',
     money: '钱',
     emptySearch: '没有符合的。试试更简单的字，或写新的一页。',
@@ -128,6 +130,9 @@ export const zhHans: TranslationCatalog = {
   },
   calendar: {
     title: '日历',
+    headerKicker: '日程与节奏',
+    headerTitle: '日程表',
+    jumpToday: '回到今天',
     views: '视图 · %{view}',
     monthly: '每月',
     timeline: '时间线',
@@ -143,6 +148,8 @@ export const zhHans: TranslationCatalog = {
   },
   money: {
     title: '钱',
+    headerKicker: '财务与钱包',
+    headerTitle: '收支总览',
     lede: '这个月，在你手机上。',
     spentThisMonth: '本月已花',
     addSpend: '记一笔',
@@ -404,6 +411,8 @@ export const zhHans: TranslationCatalog = {
   },
   you: {
     title: '设置',
+    headerKicker: '本机隐私保护',
+    headerTitle: '设置与安全',
     stays: '%{name} 留在这部手机。不会上传。',
     thisWeek: '本周',
     journal: '日记 · %{line}',
@@ -821,6 +830,9 @@ export const zhHans: TranslationCatalog = {
     templateLunch: '午餐',
     templateMTR: '地铁',
     customAmount: '自定义金额',
+    quickModeInstant: '一键与语音',
+    quickModeKeypad: '自定义键盘',
+    logAmount: '记录 %{amount}',
     voiceNeedAmount: '请加上金额 — 例如“咖啡 35”。',
   },
   split: {

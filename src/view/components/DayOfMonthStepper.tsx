@@ -71,7 +71,7 @@ export function DayOfMonthStepper({ label, value, onChange }: DayOfMonthStepperP
           onPress={() => inputRef.current?.focus()}
           style={[insetSurface(colors, 14), styles.valueWell]}
         >
-          <Text style={[styles.ordinal, { color: colors.accent }]} pointerEvents="none" numberOfLines={1}>
+          <Text style={[styles.ordinal, { color: colors.accent, pointerEvents: 'none' }]} numberOfLines={1}>
             {formatDayOfMonth(clamped, intlLocale)}
           </Text>
           <TextInput

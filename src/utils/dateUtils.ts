@@ -7,6 +7,19 @@
  */
 
 /**
+ * Purpose: formatted weekday kicker + day/month hero title for the Today home screen.
+ * Inputs: Date value and optional locale.
+ * Outputs: { weekday: 'Wednesday', title: 'September 9' } or localized equivalent.
+ * Side effects: none.
+ * Design decisions: Intl formatting provides native capitalization and word order per locale.
+ */
+export function formatHeaderDate(value: Date, locale?: string): { weekday: string; title: string } {
+  const weekday = new Intl.DateTimeFormat(locale, { weekday: 'long' }).format(value);
+  const title = new Intl.DateTimeFormat(locale, { month: 'long', day: 'numeric' }).format(value);
+  return { weekday, title };
+}
+
+/**
  * Purpose: long weekday + date heading for the Today screen.
  */
 export function formatLongDate(value: Date, locale?: string): string {

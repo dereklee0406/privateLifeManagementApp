@@ -34,7 +34,7 @@ import { budgetMonthFromDate, dateFromBudgetMonth } from '../../controller/dateF
 import { nextFireAt } from '../../model/reminders/nextFire';
 import { formatUpcoming } from '../../utils/dateUtils';
 import { appHref } from '../../utils/navigation';
-import { hapticSuccess } from '../../utils/haptics';
+import { hapticLight, hapticSuccess } from '../../utils/haptics';
 import { CardHealthList } from '../components/CardHealthList';
 import { Chip } from '../components/Chip';
 import { EmptyState } from '../components/EmptyState';
@@ -50,7 +50,7 @@ import { TypeIcon } from '../components/TypeIcon';
 import { iconForExpenseCategory, expenseCategoryLabel, iconIdForReminder, type TypeIconName } from '../icons/typeIcons';
 import { useThemeColors } from '../theme/ThemeProvider';
 import { fonts, insetSurface, raisedAccent, raisedSurface } from '../theme/tokens';
-import { tabScenePaddingBottom } from '../theme/typography';
+import { tabScenePaddingBottom, type } from '../theme/typography';
 import { useI18n, type Translate } from '../i18n';
 
 type MoneyFocus = 'all' | 'income' | 'expenses' | 'transfers' | 'budgets' | 'cards';
@@ -194,7 +194,32 @@ export function MoneyScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <LargeTitle title={t('money.title')} />
+        <View style={styles.topRow}>
+          <View style={styles.titleBlock}>
+            <Text style={[type.footnote, styles.headerKicker, { color: colors.accent }]}>
+              {t('money.headerKicker')}
+            </Text>
+            <LargeTitle title={t('money.headerTitle')} />
+          </View>
+          <Pressable
+            onPress={() => {
+              void hapticLight();
+              setQuickSpendOpen(true);
+            }}
+            style={({ pressed }) => [
+              raisedSurface(colors, 14),
+              styles.headerAction,
+              {
+                transform: [{ scale: pressed ? 0.94 : 1 }],
+                opacity: pressed ? 0.8 : 1,
+              },
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel={t('spend.quickSpend')}
+          >
+            <Ionicons name="flash-outline" size={20} color={colors.ink} accessible={false} importantForAccessibility="no" />
+          </Pressable>
+        </View>
         <Text style={[styles.lede, { color: colors.muted }]}>{t('money.lede')}</Text>
 
         <GlassSurface style={styles.hero} radius={24}>
@@ -260,19 +285,19 @@ export function MoneyScreen() {
             importantForAccessibility="no"
           />
         </Pressable>
-        <View style={styles.wrap}>
-          <Chip
-            leadingIcon="swap-horizontal-outline"
+        <View style={styles.quickActionRow}>
+          <SectionActionButton
+            icon="swap-horizontal-outline"
             label={t('money.transferAction')}
-            selected={false}
             onPress={() => router.push('/transfer/new')}
           />
-          <Chip
-            leadingIcon="repeat-outline"
+          <SectionActionButton
+            icon="repeat-outline"
             label={t('subscriptions.cockpitTitle')}
-            selected={false}
             onPress={() => router.push('/subscriptions')}
           />
+        </View>
+        <View style={styles.wrap}>
           {dueRepeats.map((rule) => (
             <Chip
               key={rule.id}
@@ -730,6 +755,29 @@ function Row({
 
 const styles = StyleSheet.create({
   content: { paddingHorizontal: 20, gap: 12 },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  titleBlock: {
+    flex: 1,
+    minWidth: 0,
+  },
+  headerKicker: {
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: 2,
+    fontFamily: fonts.bodySemi,
+  },
+  headerAction: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   lede: { fontFamily: fonts.body, fontSize: 16, lineHeight: 22 },
   hero: { padding: 20, gap: 6 },
   kicker: { fontFamily: fonts.bodySemi, fontSize: 13 },
@@ -738,6 +786,7 @@ const styles = StyleSheet.create({
   insightRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
   meta: { fontFamily: fonts.body, fontSize: 14, lineHeight: 20 },
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, width: '100%', alignItems: 'flex-start' },
+  quickActionRow: { flexDirection: 'row', gap: 10, flexWrap: 'wrap', marginBottom: 6 },
   block: { gap: 10, marginTop: 6 },
   head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10 },
   headTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 },

@@ -14,7 +14,7 @@ import { computeWeeklyLifeSummary } from '../../model/life/weeklySummary';
 import { resolveWeekStart } from '../../model/settings/AppSettings';
 import { onThisDayMemories } from '../../model/journal/onThisDay';
 import { nextUpCard } from '../../model/today/nextUp';
-import { formatLongDate, formatMemoryDate, getDayPart } from '../../utils/dateUtils';
+import { formatHeaderDate, formatMemoryDate } from '../../utils/dateUtils';
 import { appHref } from '../../utils/navigation';
 import { hapticSuccess } from '../../utils/haptics';
 import { GlassSurface } from '../components/GlassSurface';
@@ -51,16 +51,8 @@ export function HomeScreen() {
   const { t, intlLocale } = useI18n();
   const [completingNext, setCompletingNext] = useState(false);
   const [quickSpendOpen, setQuickSpendOpen] = useState(false);
-  const name = settings.writerName || t('home.defaultName');
-  const greetingKey =
-    getDayPart() === 'morning'
-      ? 'home.greetingMorning'
-      : getDayPart() === 'afternoon'
-        ? 'home.greetingAfternoon'
-        : getDayPart() === 'evening'
-          ? 'home.greetingEvening'
-          : 'home.greetingNight';
   const now = useMemo(() => new Date(), [entries.length, reminders.length, expenses.length]);
+  const headerDate = useMemo(() => formatHeaderDate(now, intlLocale), [now, intlLocale]);
   const weekStartsOn = resolveWeekStart(settings);
   const next = useMemo(
     () => nextUpCard(reminders, creditCards, settings.defaultCurrency, now),
@@ -125,21 +117,27 @@ export function HomeScreen() {
       >
         <View style={styles.topRow}>
           <View style={styles.titleBlock}>
-            <Text style={[type.footnote, styles.kicker, { color: colors.muted }]}>{formatLongDate(new Date(), intlLocale)}</Text>
-            <LargeTitle title={t('home.title')} />
+            <Text style={[type.footnote, styles.kicker, { color: colors.accent }]}>
+              {headerDate.weekday.toUpperCase()}
+            </Text>
+            <LargeTitle title={headerDate.title} />
           </View>
           <Pressable
             onPress={() => router.push('/(tabs)/journal')}
-            style={styles.searchHit}
+            style={({ pressed }) => [
+              raisedSurface(colors, 14),
+              styles.searchButton,
+              {
+                transform: [{ scale: pressed ? 0.94 : 1 }],
+                opacity: pressed ? 0.8 : 1,
+              },
+            ]}
+            accessibilityRole="button"
             accessibilityLabel={t('home.searchA11y')}
           >
-            <Ionicons name="search" size={22} color={colors.accent} />
+            <Ionicons name="search" size={20} color={colors.ink} />
           </Pressable>
         </View>
-        <Text style={[type.title2, styles.hello, { color: colors.ink }]}>
-          {t('home.hello', { greeting: t(greetingKey), name })}
-        </Text>
-        <Text style={[styles.tag, { color: colors.faint }]}>{t('home.tag')}</Text>
 
         <View style={[raisedSurface(colors, 22), styles.capsuleBar, { backgroundColor: colors.accentSoft }]}>
           <Pressable
@@ -353,8 +351,10 @@ const styles = StyleSheet.create({
   },
   topRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     gap: 12,
+    marginBottom: 16,
   },
   titleBlock: {
     flex: 1,
@@ -362,32 +362,22 @@ const styles = StyleSheet.create({
   },
   kicker: {
     textTransform: 'uppercase',
-    letterSpacing: 0.6,
+    letterSpacing: 0.8,
     marginBottom: 2,
+    fontFamily: fonts.bodySemi,
   },
-  searchHit: {
-    minWidth: 44,
-    minHeight: 44,
+  searchButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 18,
-  },
-  hello: {
-    marginTop: 2,
-    marginBottom: 4,
-  },
-  tag: {
-    fontFamily: fonts.body,
-    fontSize: 17,
-    lineHeight: 24,
-    marginTop: 8,
-    marginBottom: 18,
   },
   capsuleBar: {
     flexDirection: 'row',
     alignItems: 'center',
     minHeight: 52,
-    marginBottom: 18,
+    marginBottom: 16,
     paddingHorizontal: 4,
   },
   capsuleHit: {
