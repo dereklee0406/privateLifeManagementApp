@@ -1,6 +1,6 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFinance } from '../../controller/FinanceProvider';
@@ -13,8 +13,6 @@ import {
   resolveExpenseCategories,
   type ExpenseCategory,
 } from '../../model/finance/Expense';
-import { cardHealthFor } from '../../model/finance/cardHealth';
-import { calculateCardMonthlyRebateSummary } from '../../model/finance/creditCardRebates';
 import {
   budgetProgressFor,
   expenseRangeFromPreset,
@@ -31,15 +29,13 @@ import { formatExpenseSpendLine } from '../../model/finance/fx';
 import { summarizeSplit, type ExpenseSplit } from '../../model/finance/ExpenseSplit';
 import { resolveShowAdvancedFinance, resolveCardFxFeeRate } from '../../model/settings/AppSettings';
 import { budgetMonthFromDate, dateFromBudgetMonth } from '../../controller/dateFieldValue';
-import { nextFireAt } from '../../model/reminders/nextFire';
-import { formatUpcoming } from '../../utils/dateUtils';
 import { appHref } from '../../utils/navigation';
 import { hapticLight, hapticSuccess } from '../../utils/haptics';
-import { CardHealthList } from '../components/CardHealthList';
 import { Chip } from '../components/Chip';
 import { EmptyState } from '../components/EmptyState';
 import { DateField } from '../components/DateField';
 import { GlassSurface } from '../components/GlassSurface';
+import { HubSegmentControl, type HubSegmentOption } from '../components/HubSegmentControl';
 import { QuickSpendSheet } from '../components/QuickSpendSheet';
 import { ScreenScaffold } from '../components/ScreenScaffold';
 import { SectionActionButton } from '../components/SectionActionButton';
@@ -47,13 +43,30 @@ import { SpendCardBadge } from '../components/SpendCardBadge';
 import { SpendTrendBars } from '../components/SpendTrendBars';
 import { LargeTitle } from '../components/LargeTitle';
 import { TypeIcon } from '../components/TypeIcon';
-import { iconForExpenseCategory, expenseCategoryLabel, iconIdForReminder, type TypeIconName } from '../icons/typeIcons';
+import { iconForExpenseCategory, expenseCategoryLabel, type TypeIconName } from '../icons/typeIcons';
 import { useThemeColors } from '../theme/ThemeProvider';
 import { fonts, insetSurface, raisedAccent, raisedSurface } from '../theme/tokens';
 import { tabScenePaddingBottom, type } from '../theme/typography';
 import { useI18n, type Translate } from '../i18n';
+import { PaymentCardsScreen } from './PaymentCardsScreen';
+import { SubscriptionsCockpitScreen } from './SubscriptionsCockpitScreen';
 
-type MoneyFocus = 'all' | 'income' | 'expenses' | 'transfers' | 'budgets' | 'cards';
+type MoneyHubSegment = 'cashflow' | 'subscriptions' | 'cards';
+type MoneyFocus = 'all' | 'income' | 'expenses' | 'transfers' | 'budgets';
+
+/**
+ * Purpose: parse deep-link / tab search param into a Money hub segment.
+ * Inputs: raw `segment` query (string | string[] | undefined).
+ * Outputs: MoneyHubSegment or null when absent / unknown.
+ * Side effects: none.
+ */
+function parseMoneySegment(raw: string | string[] | undefined): MoneyHubSegment | null {
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  if (value === 'cashflow' || value === 'subscriptions' || value === 'cards') {
+    return value;
+  }
+  return null;
+}
 
 /**
  * Purpose: append a subtle pending-split badge to spend row meta when collections remain.
@@ -74,23 +87,27 @@ function spendMetaWithSplit(base: string, split: ExpenseSplit | undefined, t: Tr
   });
   return base ? `${base} · ${badge}` : badge;
 }
+
 /**
- * Purpose: Money tab — this month’s spend, add a spend, upcoming bills; extra tools stay folded.
- * Inputs: finance, reminders, settings (showAdvancedFinance / simpleMoney).
- * Outputs: everyday Money canvas; budgets, income, bills/cards, net picture behind More money tools.
- * Side effects: inline budget saves; navigation to editors.
- * Design decisions: “What I have” / “What I owe” list UI removed; assets/loans still feed net-worth math.
- *   When cards exist, Bills & cards shows month-to-date cashback via calculateCardMonthlyRebateSummary.
+ * Purpose: Money tab — 3-segment financial hub (Cashflow / Subscriptions / Cards & Rewards).
+ * Inputs: finance, reminders, settings; optional `segment` search param for deep links.
+ * Outputs: editorial header + neumorphic segment control; Cashflow canvas or embedded
+ *   Subscriptions / Payment Cards panels while the floating tab bar stays visible.
+ * Side effects: inline budget saves; navigation to composers; QuickSpend sheet.
+ * Design decisions: subscriptions & cards live as hub segments (no stack push that hides the
+ *   tab bar). Standalone `/subscriptions` and `/payment-cards` routes keep working for
+ *   external links. Cashflow focus chips drop the old Cards filter (cards have their own tab).
  */
 export function MoneyScreen() {
-  const { t, intlLocale } = useI18n();
+  const { t } = useI18n();
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const params = useLocalSearchParams<{ segment?: string | string[] }>();
   const { settings } = useSettings();
   const { expenses, incomes, budgets, assets, loans, transfers, dueRepeats, upsertBudget, logRecurringSpendInstant, splitsByExpenseId } =
     useFinance();
-  const { reminders, creditCards } = useReminders();
+  const { creditCards } = useReminders();
   const now = new Date();
   const year = now.getFullYear();
   const month = now.getMonth();
@@ -103,6 +120,7 @@ export function MoneyScreen() {
   const extrasOn = resolveShowAdvancedFinance(settings, hasAssetsOrLoans);
   const [openExtras, setOpenExtras] = useState(extrasOn);
   const showExtras = extrasOn || openExtras;
+  const [hub, setHub] = useState<MoneyHubSegment>(() => parseMoneySegment(params.segment) ?? 'cashflow');
   const [focus, setFocus] = useState<MoneyFocus>('all');
   const [expenseCategory, setExpenseCategory] = useState<ExpenseCategory | 'all'>('all');
   const [expensePreset, setExpensePreset] = useState<ExpenseDatePreset>('month');
@@ -118,6 +136,22 @@ export function MoneyScreen() {
     }
     return map;
   }, [creditCards]);
+
+  useEffect(() => {
+    const next = parseMoneySegment(params.segment);
+    if (next) {
+      setHub(next);
+    }
+  }, [params.segment]);
+
+  const hubOptions = useMemo(
+    (): HubSegmentOption<MoneyHubSegment>[] => [
+      { id: 'cashflow', label: t('money.tabCashflow'), icon: 'wallet-outline' },
+      { id: 'subscriptions', label: t('money.tabSubscriptions'), icon: 'repeat-outline' },
+      { id: 'cards', label: t('money.tabCards'), icon: 'card-outline' },
+    ],
+    [t],
+  );
 
   const snapshot = useMemo(
     () => monthSnapshotFor(incomes, expenses, year, month, currency),
@@ -138,39 +172,9 @@ export function MoneyScreen() {
     () => filterExpenses(expenses, { category: expenseCategory, fromDay: range.fromDay, toDay: range.toDay }).slice(0, 20),
     [expenses, expenseCategory, range.fromDay, range.toDay],
   );
-  const upcoming = useMemo(() => {
-    return reminders
-      .filter((item) => item.enabled && item.categoryPath.top === 'financial')
-      .map((item) => ({ item, fireAt: nextFireAt(item, now) }))
-      .filter((row) => row.fireAt)
-      .sort((left, right) => (left.fireAt?.getTime() ?? 0) - (right.fireAt?.getTime() ?? 0))
-      .slice(0, 8);
-  }, [reminders]);
-  const bills = useMemo(
-    () => reminders.filter((item) => item.categoryPath.top === 'financial' && item.categoryPath.subcategory === 'bills'),
-    [reminders],
-  );
   const monthSpends = useMemo(
     () => filterExpenses(expenses, { category: 'all', fromDay: range.fromDay, toDay: range.toDay }).slice(0, 8),
     [expenses, range.fromDay, range.toDay],
-  );
-  const cardHealth = useMemo(
-    () => cardHealthFor(creditCards, currency, now),
-    [creditCards, currency],
-  );
-  /**
-   * Purpose: sum month-to-date cashback earned across all payment cards.
-   * Inputs: creditCards + expenses.
-   * Outputs: total rebate dollars for the current month.
-   * Side effects: none.
-   */
-  const totalMonthlyRebates = useMemo(
-    () =>
-      creditCards.reduce(
-        (sum, card) => sum + calculateCardMonthlyRebateSummary(card, expenses).totalRebate,
-        0,
-      ),
-    [creditCards, expenses],
   );
   const show = (section: MoneyFocus) => focus === 'all' || focus === section;
 
@@ -189,11 +193,7 @@ export function MoneyScreen() {
 
   return (
     <ScreenScaffold>
-      <ScrollView
-        contentContainerStyle={[styles.content, { paddingTop: insets.top + 8, paddingBottom: tabScenePaddingBottom(insets.bottom) }]}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
+      <View style={[styles.chrome, { paddingTop: insets.top + 8 }]}>
         <View style={styles.topRow}>
           <View style={styles.titleBlock}>
             <Text style={[type.footnote, styles.headerKicker, { color: colors.accent }]}>
@@ -221,471 +221,383 @@ export function MoneyScreen() {
           </Pressable>
         </View>
         <Text style={[styles.lede, { color: colors.muted }]}>{t('money.lede')}</Text>
+        <HubSegmentControl options={hubOptions} value={hub} onChange={setHub} />
+      </View>
 
-        <GlassSurface style={styles.hero} radius={24}>
-          <Text style={[styles.kicker, { color: colors.faint }]}>{t('money.spentThisMonth')}</Text>
-          <Text style={[styles.heroValue, { color: colors.ink }]}>{formatMoney(snapshot.spent, currency)}</Text>
-          {insight.changeLine ? (
-            <Text style={[styles.insight, { color: colors.muted }]} numberOfLines={2}>
-              {insight.changeLine}
+      {hub === 'cashflow' ? (
+        <ScrollView
+          style={styles.hubScroll}
+          contentContainerStyle={[styles.content, { paddingBottom: tabScenePaddingBottom(insets.bottom) }]}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <GlassSurface style={styles.hero} radius={24}>
+            <Text style={[styles.kicker, { color: colors.faint }]}>{t('money.spentThisMonth')}</Text>
+            <Text style={[styles.heroValue, { color: colors.ink }]}>{formatMoney(snapshot.spent, currency)}</Text>
+            {insight.changeLine ? (
+              <Text style={[styles.insight, { color: colors.muted }]} numberOfLines={2}>
+                {insight.changeLine}
+              </Text>
+            ) : null}
+            {insight.topCategory && insight.topCategoryAmount > 0 ? (
+              <View style={styles.insightRow}>
+                <TypeIcon
+                  typeId={insight.topCategory}
+                  icon={iconForExpenseCategory(insight.topCategory, expenseCatalog)}
+                  accessibilityLabel={expenseCategoryLabel(t, insight.topCategory, expenseCatalog)}
+                />
+                <Text style={[styles.insight, { color: colors.muted, marginTop: 0 }]} numberOfLines={2}>
+                  {formatMoney(insight.topCategoryAmount, currency)}
+                </Text>
+              </View>
+            ) : null}
+            {currency === 'HKD' && cardFeeRate > 0 ? (
+              <Text style={[styles.insight, { color: colors.faint }]} numberOfLines={2}>
+                {t('money.estimateHintShort')}
+              </Text>
+            ) : null}
+          </GlassSurface>
+
+          <Pressable
+            onPress={() => router.push('/expense/new')}
+            style={[raisedAccent(colors, 22), styles.addSpend]}
+            accessibilityRole="button"
+            accessibilityLabel={t('money.addSpend')}
+          >
+            <Ionicons name="add-circle-outline" size={20} color={colors.accentInk} style={{ marginRight: 6 }} accessible={false} importantForAccessibility="no" />
+            <Text style={[styles.addSpendLabel, { color: colors.accentInk }]} numberOfLines={2}>
+              {t('money.addSpend')}
             </Text>
-          ) : null}
-          {insight.topCategory && insight.topCategoryAmount > 0 ? (
-            <View style={styles.insightRow}>
-              <TypeIcon
-                typeId={insight.topCategory}
-                icon={iconForExpenseCategory(insight.topCategory, expenseCatalog)}
-                accessibilityLabel={expenseCategoryLabel(t, insight.topCategory, expenseCatalog)}
-              />
-              <Text style={[styles.insight, { color: colors.muted, marginTop: 0 }]} numberOfLines={2}>
-                {formatMoney(insight.topCategoryAmount, currency)}
+          </Pressable>
+          <Pressable
+            onPress={() => setQuickSpendOpen(true)}
+            style={[raisedSurface(colors, 22), styles.quickSpend]}
+            accessibilityRole="button"
+            accessibilityLabel={t('spend.quickSpend')}
+          >
+            <View style={[styles.quickSpendIcon, { backgroundColor: colors.accentSoft }]}>
+              <Ionicons name="flash" size={20} color={colors.accent} accessible={false} importantForAccessibility="no" />
+            </View>
+            <View style={styles.quickSpendCopy}>
+              <Text style={[styles.quickSpendLabel, { color: colors.ink }]} numberOfLines={1}>
+                {t('spend.quickSpend')}
+              </Text>
+              <Text style={[styles.quickSpendHint, { color: colors.muted }]} numberOfLines={2}>
+                {t('spend.quickSpendHint')}
               </Text>
             </View>
-          ) : null}
-          {currency === 'HKD' && cardFeeRate > 0 ? (
-            <Text style={[styles.insight, { color: colors.faint }]} numberOfLines={2}>
-              {t('money.estimateHintShort')}
-            </Text>
-          ) : null}
-        </GlassSurface>
-
-        <Pressable
-          onPress={() => router.push('/expense/new')}
-          style={[raisedAccent(colors, 22), styles.addSpend]}
-          accessibilityRole="button"
-          accessibilityLabel={t('money.addSpend')}
-        >
-          <Ionicons name="add-circle-outline" size={20} color={colors.accentInk} style={{ marginRight: 6 }} accessible={false} importantForAccessibility="no" />
-          <Text style={[styles.addSpendLabel, { color: colors.accentInk }]} numberOfLines={2}>
-            {t('money.addSpend')}
-          </Text>
-        </Pressable>
-        <Pressable
-          onPress={() => setQuickSpendOpen(true)}
-          style={[raisedSurface(colors, 22), styles.quickSpend]}
-          accessibilityRole="button"
-          accessibilityLabel={t('spend.quickSpend')}
-        >
-          <View style={[styles.quickSpendIcon, { backgroundColor: colors.accentSoft }]}>
-            <Ionicons name="flash" size={20} color={colors.accent} accessible={false} importantForAccessibility="no" />
-          </View>
-          <View style={styles.quickSpendCopy}>
-            <Text style={[styles.quickSpendLabel, { color: colors.ink }]} numberOfLines={1}>
-              {t('spend.quickSpend')}
-            </Text>
-            <Text style={[styles.quickSpendHint, { color: colors.muted }]} numberOfLines={2}>
-              {t('spend.quickSpendHint')}
-            </Text>
-          </View>
-          <Ionicons
-            name="chevron-forward"
-            size={18}
-            color={colors.faint}
-            accessible={false}
-            importantForAccessibility="no"
-          />
-        </Pressable>
-        <View style={styles.quickActionRow}>
-          <SectionActionButton
-            icon="swap-horizontal-outline"
-            label={t('money.transferAction')}
-            onPress={() => router.push('/transfer/new')}
-          />
-          <SectionActionButton
-            icon="repeat-outline"
-            label={t('subscriptions.cockpitTitle')}
-            onPress={() => router.push('/subscriptions')}
-          />
-        </View>
-        <View style={styles.wrap}>
-          {dueRepeats.map((rule) => (
-            <Chip
-              key={rule.id}
-              label={recurringSpendChipLabel(rule)}
-              selected={loggingId === rule.id}
-              onPress={() => void logDueRepeat(rule.id)}
-              onLongPress={() =>
-                router.push(
-                  appHref(
-                    `/expense/new?category=${rule.category}&amount=${rule.amount}&note=${encodeURIComponent(rule.note ?? '')}&recurringId=${rule.id}`,
-                  ),
-                )
-              }
+            <Ionicons
+              name="chevron-forward"
+              size={18}
+              color={colors.faint}
+              accessible={false}
+              importantForAccessibility="no"
             />
-          ))}
-          {quickAddIds.map((id) => (
-            <Chip
-              key={id}
-              icon={iconForExpenseCategory(id, expenseCatalog)}
-              label={`${expenseCategoryLabel(t, id, expenseCatalog)} · ${currency}`}
-              selected={false}
-              onPress={() => router.push(appHref(`/expense/new?category=${id}`))}
+          </Pressable>
+          <View style={styles.quickActionRow}>
+            <SectionActionButton
+              icon="swap-horizontal-outline"
+              label={t('money.transferAction')}
+              onPress={() => router.push('/transfer/new')}
             />
-          ))}
-        </View>
-
-        <Section
-          title={t('money.cards')}
-          icon="card-outline"
-          action={t('money.addCard')}
-          actionIcon="card-outline"
-          onAction={() => router.push(appHref('/reminders/card/new'))}
-          colors={colors}
-        >
-          {creditCards.length > 0 ? (
-            <Pressable
-              onPress={() => router.push(appHref('/payment-cards'))}
-              style={[insetSurface(colors, 14), styles.cashbackBanner]}
-              accessibilityRole="button"
-              accessibilityLabel={`This month's card cashback: ${formatMoney(totalMonthlyRebates, currency)}`}
-            >
-              <Text style={[styles.cashbackBannerText, { color: colors.accent }]}>
-                {`🎁 This month's card cashback: ${formatMoney(totalMonthlyRebates, currency)}`}
-              </Text>
-            </Pressable>
-          ) : null}
-          <CardHealthList
-            rows={cardHealth}
-            onOpenCard={(id) => router.push(appHref(`/reminders/card/${id}`))}
-          />
-        </Section>
-
-        {!showExtras ? (
-          <View style={styles.block}>
-            {monthSpends.length === 0 ? (
-              <EmptyState
-                message={t('money.emptyMonth')}
-                actionLabel={t('money.addSpend')}
-                actionIcon="wallet-outline"
-                onAction={() => router.push('/expense/new')}
+            <SectionActionButton
+              icon="trending-up-outline"
+              label={t('money.addIncome')}
+              onPress={() => router.push('/income/new')}
+            />
+          </View>
+          <View style={styles.wrap}>
+            {dueRepeats.map((rule) => (
+              <Chip
+                key={rule.id}
+                label={recurringSpendChipLabel(rule)}
+                selected={loggingId === rule.id}
+                onPress={() => void logDueRepeat(rule.id)}
+                onLongPress={() =>
+                  router.push(
+                    appHref(
+                      `/expense/new?category=${rule.category}&amount=${rule.amount}&note=${encodeURIComponent(rule.note ?? '')}&recurringId=${rule.id}`,
+                    ),
+                  )
+                }
               />
-            ) : (
-              monthSpends.map((item) => (
-                <Pressable
-                  key={item.id}
-                  onPress={() => router.push(appHref(`/expense/${item.id}`))}
-                  accessibilityLabel={t('money.editSpendA11y', { spend: formatExpenseSpendLine(item) })}
-                >
+            ))}
+            {quickAddIds.map((id) => (
+              <Chip
+                key={id}
+                icon={iconForExpenseCategory(id, expenseCatalog)}
+                label={`${expenseCategoryLabel(t, id, expenseCatalog)} · ${currency}`}
+                selected={false}
+                onPress={() => router.push(appHref(`/expense/new?category=${id}`))}
+              />
+            ))}
+          </View>
+
+          <View style={styles.wrap}>
+            {(
+              [
+                ['all', t('money.all'), 'apps-outline'],
+                ['income', t('money.focusIncome'), 'trending-up-outline'],
+                ['expenses', t('money.focusSpends'), 'wallet-outline'],
+                ['budgets', t('money.focusBudgets'), 'pie-chart-outline'],
+                ['transfers', t('money.focusTransfers'), 'swap-horizontal-outline'],
+              ] as const
+            ).map(([id, label, icon]) => (
+              <Chip key={id} icon={icon} label={label} selected={focus === id} onPress={() => setFocus(id)} />
+            ))}
+          </View>
+
+          {show('expenses') || focus === 'all' ? (
+            <Section
+              title={t('money.spends')}
+              icon="wallet-outline"
+              action={t('money.addSpend')}
+              actionIcon="wallet-outline"
+              onAction={() => router.push('/expense/new')}
+              colors={colors}
+            >
+              {focus === 'expenses' ? (
+                <>
+                  <View style={styles.wrap}>
+                    <Chip label={t('money.timeFilterMonth')} selected={expensePreset === 'month'} onPress={() => setExpensePreset('month')} />
+                    <Chip label={t('money.timeFilter7d')} selected={expensePreset === '7d'} onPress={() => setExpensePreset('7d')} />
+                    <Chip label={t('money.timeFilter30d')} selected={expensePreset === '30d'} onPress={() => setExpensePreset('30d')} />
+                    <Chip label={t('money.timeFilterAll')} selected={expensePreset === 'all'} onPress={() => setExpensePreset('all')} />
+                  </View>
+                  <View style={styles.wrap}>
+                    <Chip label={t('money.categoryFilterAny')} selected={expenseCategory === 'all'} onPress={() => setExpenseCategory('all')} />
+                    {activeCategories.map((item) => (
+                      <Chip
+                        key={item.id}
+                        icon={iconForExpenseCategory(item.id, expenseCatalog)}
+                        label={expenseCategoryLabel(t, item.id, expenseCatalog)}
+                        selected={expenseCategory === item.id}
+                        onPress={() => setExpenseCategory(item.id)}
+                      />
+                    ))}
+                  </View>
+                  {visibleExpenses.length === 0 ? (
+                    <EmptyState
+                      message={t('money.emptyList')}
+                      actionLabel={t('money.addSpend')}
+                      actionIcon="wallet-outline"
+                      onAction={() => router.push('/expense/new')}
+                    />
+                  ) : (
+                    visibleExpenses.map((item) => (
+                      <Pressable
+                        key={item.id}
+                        onPress={() => router.push(appHref(`/expense/${item.id}`))}
+                        accessibilityLabel={t('money.editSpendA11y', { spend: formatExpenseSpendLine(item) })}
+                      >
+                        <Row
+                          title={formatExpenseSpendLine(item)}
+                          meta={spendMetaWithSplit(
+                            `${item.dayKey}${item.note ? ` · ${item.note}` : ''}`,
+                            splitsByExpenseId.get(item.id),
+                            t,
+                          )}
+                          cardName={item.cardId ? cardNameById.get(item.cardId) : undefined}
+                          typeId={item.category}
+                          icon={iconForExpenseCategory(item.category, expenseCatalog)}
+                          colors={colors}
+                        />
+                      </Pressable>
+                    ))
+                  )}
+                </>
+              ) : monthSpends.length === 0 ? (
+                <EmptyState
+                  message={t('money.emptyMonth')}
+                  actionLabel={t('money.addSpend')}
+                  actionIcon="wallet-outline"
+                  onAction={() => router.push('/expense/new')}
+                />
+              ) : (
+                monthSpends.map((item) => (
+                  <Pressable
+                    key={item.id}
+                    onPress={() => router.push(appHref(`/expense/${item.id}`))}
+                    accessibilityLabel={t('money.editSpendA11y', { spend: formatExpenseSpendLine(item) })}
+                  >
+                    <Row
+                      title={formatExpenseSpendLine(item)}
+                      meta={spendMetaWithSplit(
+                        item.note ? `${item.dayKey} · ${item.note}` : item.dayKey,
+                        splitsByExpenseId.get(item.id),
+                        t,
+                      )}
+                      cardName={item.cardId ? cardNameById.get(item.cardId) : undefined}
+                      typeId={item.category}
+                      icon={iconForExpenseCategory(item.category, expenseCatalog)}
+                      colors={colors}
+                    />
+                  </Pressable>
+                ))
+              )}
+            </Section>
+          ) : null}
+
+          {show('income') ? (
+            <Section title={t('money.income')} icon="trending-up-outline" action={t('money.addIncome')} actionIcon="add" onAction={() => router.push('/income/new')} colors={colors}>
+              {incomes.length === 0 ? (
+                <Text style={[styles.meta, { color: colors.faint }]}>{t('money.incomeLede')}</Text>
+              ) : (
+                incomes.slice(0, 8).map((item) => (
                   <Row
-                    title={formatExpenseSpendLine(item)}
-                    meta={spendMetaWithSplit(
-                      item.note ? `${item.dayKey} · ${item.note}` : item.dayKey,
-                      splitsByExpenseId.get(item.id),
-                      t,
-                    )}
-                    cardName={item.cardId ? cardNameById.get(item.cardId) : undefined}
-                    typeId={item.category}
-                    icon={iconForExpenseCategory(item.category, expenseCatalog)}
+                    key={item.id}
+                    title={formatMoney(item.amount, item.currency)}
+                    meta={`${item.dayKey}${item.note ? ` · ${item.note}` : ''}`}
+                    typeId={item.kind}
                     colors={colors}
                   />
-                </Pressable>
-              ))
-            )}
-          </View>
-        ) : null}
+                ))
+              )}
+            </Section>
+          ) : null}
 
-        <Section
-          title={t('money.upcomingBills')}
-          icon="notifications-outline"
-          action={t('money.remindMe')}
-          actionIcon="notifications-outline"
-          onAction={() => router.push(appHref('/reminders/new'))}
-          colors={colors}
-        >
-          {upcoming.length === 0 ? (
-            <Text style={[styles.meta, { color: colors.faint }]}>{t('money.upcomingEmpty')}</Text>
-          ) : (
-            upcoming.map(({ item, fireAt }) => (
-              <Pressable key={item.id} onPress={() => router.push(appHref(`/reminders/${item.id}`))}>
-                <Row
-                  title={item.title}
-                  meta={fireAt ? formatUpcoming(fireAt, new Date(), intlLocale, { today: t('date.today'), tomorrow: t('date.tomorrow') }) : t('common.soon')}
-                  typeId={iconIdForReminder(item.categoryPath, item.templateId)}
-                  colors={colors}
-                />
-              </Pressable>
-            ))
-          )}
-        </Section>
-
-        {showExtras ? (
-          <>
-            <View style={styles.wrap}>
-              {(
-                [
-                  ['all', t('money.all'), 'apps-outline'],
-                  ['income', t('money.focusIncome'), 'trending-up-outline'],
-                  ['expenses', t('money.focusSpends'), 'wallet-outline'],
-                  ['transfers', t('money.focusTransfers'), 'swap-horizontal-outline'],
-                  ['budgets', t('money.focusBudgets'), 'pie-chart-outline'],
-                  ['cards', t('money.focusCards'), 'card-outline'],
-                ] as const
-              ).map(([id, label, icon]) => (
-                <Chip key={id} icon={icon} label={label} selected={focus === id} onPress={() => setFocus(id)} />
-              ))}
-            </View>
-
-            <GlassSurface style={styles.hero} radius={24}>
-              <Text style={[styles.kicker, { color: colors.faint }]}>{t('money.netPicture')}</Text>
-              <Text style={[styles.heroValue, { color: colors.ink }]}>{formatMoney(net.net, currency)}</Text>
-              <Text style={[styles.meta, { color: colors.muted }]}>
-                {t('money.have', { amount: formatMoney(net.assets, currency) })} · {t('money.owe', { amount: formatMoney(net.loans, currency) })}
-                {net.cardDebt ? ` · ${t('money.cardsDebt', { amount: formatMoney(net.cardDebt, currency) })}` : ''}
-              </Text>
-              <Text style={[styles.meta, { color: colors.faint }]}>
-                {t('money.thisMonthSummary', {
-                  income: formatMoney(snapshot.income, currency),
-                  spent: formatMoney(snapshot.spent, currency),
-                })}
-              </Text>
-              {net.omittedOtherCurrency ? (
-                <Text style={[styles.meta, { color: colors.faint }]}>{t('money.otherCurrenciesNote')}</Text>
-              ) : null}
-            </GlassSurface>
-
-            <SpendTrendBars rows={trend} />
-            <Text style={[styles.meta, { color: colors.faint }]}>{t('money.netWorthComingLater')}</Text>
-
-            {show('income') ? (
-              <Section title={t('money.income')} icon="trending-up-outline" action={t('money.addIncome')} actionIcon="add" onAction={() => router.push('/income/new')} colors={colors}>
-                {incomes.length === 0 ? (
-                  <Text style={[styles.meta, { color: colors.faint }]}>{t('money.incomeLede')}</Text>
-                ) : (
-                  incomes.slice(0, 8).map((item) => (
-                    <Row
-                      key={item.id}
-                      title={formatMoney(item.amount, item.currency)}
-                      meta={`${item.dayKey}${item.note ? ` · ${item.note}` : ''}`}
-                      typeId={item.kind}
-                      colors={colors}
+          {show('budgets') ? (
+            <Section title={t('money.budgets')} icon="pie-chart-outline" colors={colors}>
+              <Text style={[styles.meta, { color: colors.muted }]}>{t('money.budgetsLede')}</Text>
+              {budgetRows.map((row) => (
+                <GlassSurface key={row.budget.id} style={styles.rowCard} radius={18}>
+                  <View style={styles.rowInner}>
+                    <TypeIcon
+                      typeId={row.budget.category}
+                      icon={iconForExpenseCategory(row.budget.category, expenseCatalog)}
+                      accessibilityLabel={expenseCategoryLabel(t, row.budget.category, expenseCatalog)}
                     />
-                  ))
-                )}
-              </Section>
-            ) : null}
-
-            {show('transfers') ? (
-              <Section
-                title={t('money.transfers')}
-                icon="swap-horizontal-outline"
-                action={t('money.newTransfer')}
-                actionIcon="swap-horizontal-outline"
-                onAction={() => router.push('/transfer/new')}
-                colors={colors}
-              >
-                {transfers.length === 0 ? (
-                  <Text style={[styles.meta, { color: colors.faint }]}>{t('money.transfersEmpty')}</Text>
-                ) : (
-                  transfers.slice(0, 8).map((item) => (
-                    <Row
-                      key={item.id}
-                      title={formatMoney(item.amount, item.currency)}
-                      meta={`${item.dayKey}${item.note ? ` · ${item.note}` : ''}${item.fee ? ` ${t('money.feeLabel', { amount: formatMoney(item.fee, item.currency) })}` : ''}`}
-                      typeId="transfers"
-                      icon="swap-horizontal-outline"
-                      colors={colors}
-                    />
-                  ))
-                )}
-              </Section>
-            ) : null}
-
-            {show('expenses') ? (
-              <Section
-                title={t('money.spends')}
-                icon="wallet-outline"
-                action={t('money.addSpend')}
-                actionIcon="wallet-outline"
-                onAction={() => router.push('/expense/new')}
-                colors={colors}
-              >
-                <View style={styles.wrap}>
-                  <Chip label={t('money.timeFilterMonth')} selected={expensePreset === 'month'} onPress={() => setExpensePreset('month')} />
-                  <Chip label={t('money.timeFilter7d')} selected={expensePreset === '7d'} onPress={() => setExpensePreset('7d')} />
-                  <Chip label={t('money.timeFilter30d')} selected={expensePreset === '30d'} onPress={() => setExpensePreset('30d')} />
-                  <Chip label={t('money.timeFilterAll')} selected={expensePreset === 'all'} onPress={() => setExpensePreset('all')} />
-                </View>
-                <View style={styles.wrap}>
-                  <Chip label={t('money.categoryFilterAny')} selected={expenseCategory === 'all'} onPress={() => setExpenseCategory('all')} />
-                  {activeCategories.map((item) => (
-                    <Chip
-                      key={item.id}
-                      icon={iconForExpenseCategory(item.id, expenseCatalog)}
-                      label={expenseCategoryLabel(t, item.id, expenseCatalog)}
-                      selected={expenseCategory === item.id}
-                      onPress={() => setExpenseCategory(item.id)}
-                    />
-                  ))}
-                </View>
-                {visibleExpenses.length === 0 ? (
-                  <EmptyState
-                    message={t('money.emptyList')}
-                    actionLabel={t('money.addSpend')}
-                    actionIcon="wallet-outline"
-                    onAction={() => router.push('/expense/new')}
-                  />
-                ) : (
-                  visibleExpenses.map((item) => (
-                    <Pressable
-                      key={item.id}
-                      onPress={() => router.push(appHref(`/expense/${item.id}`))}
-                      accessibilityLabel={t('money.editSpendA11y', { spend: formatExpenseSpendLine(item) })}
-                    >
-                      <Row
-                        title={formatExpenseSpendLine(item)}
-                        meta={spendMetaWithSplit(
-                          `${item.dayKey}${item.note ? ` · ${item.note}` : ''}`,
-                          splitsByExpenseId.get(item.id),
-                          t,
-                        )}
-                        cardName={item.cardId ? cardNameById.get(item.cardId) : undefined}
-                        typeId={item.category}
-                        icon={iconForExpenseCategory(item.category, expenseCatalog)}
-                        colors={colors}
-                      />
-                    </Pressable>
-                  ))
-                )}
-              </Section>
-            ) : null}
-
-            {show('budgets') ? (
-              <Section title={t('money.budgets')} icon="pie-chart-outline" colors={colors}>
-                <Text style={[styles.meta, { color: colors.muted }]}>{t('money.budgetsLede')}</Text>
-                {budgetRows.map((row) => (
-                  <GlassSurface key={row.budget.id} style={styles.rowCard} radius={18}>
-                    <View style={styles.rowInner}>
-                      <TypeIcon
-                        typeId={row.budget.category}
-                        icon={iconForExpenseCategory(row.budget.category, expenseCatalog)}
-                        accessibilityLabel={expenseCategoryLabel(t, row.budget.category, expenseCatalog)}
-                      />
-                      <View style={styles.rowCopy}>
-                        <Text style={[styles.rowTitle, { color: row.over ? colors.danger : colors.ink }]}>
-                          {formatMoney(row.spent, currency)} / {formatMoney(row.budget.limit, currency)}
-                        </Text>
-                        <Text style={[styles.meta, { color: colors.muted }]}>
-                          {row.over ? t('money.budgetOverMonth') : t('money.budgetRemaining', { amount: formatMoney(row.remaining, currency) })}
-                        </Text>
-                      </View>
+                    <View style={styles.rowCopy}>
+                      <Text style={[styles.rowTitle, { color: row.over ? colors.danger : colors.ink }]}>
+                        {formatMoney(row.spent, currency)} / {formatMoney(row.budget.limit, currency)}
+                      </Text>
+                      <Text style={[styles.meta, { color: colors.muted }]}>
+                        {row.over ? t('money.budgetOverMonth') : t('money.budgetRemaining', { amount: formatMoney(row.remaining, currency) })}
+                      </Text>
                     </View>
-                  </GlassSurface>
+                  </View>
+                </GlassSurface>
+              ))}
+              <View style={styles.wrap}>
+                {activeCategories.map((item) => (
+                  <Chip
+                    key={item.id}
+                    icon={iconForExpenseCategory(item.id, expenseCatalog)}
+                    label={expenseCategoryLabel(t, item.id, expenseCatalog)}
+                    selected={budgetCategory === item.id}
+                    onPress={() => setBudgetCategory(item.id)}
+                  />
                 ))}
-                <View style={styles.wrap}>
-                  {activeCategories.map((item) => (
-                    <Chip
-                      key={item.id}
-                      icon={iconForExpenseCategory(item.id, expenseCatalog)}
-                      label={expenseCategoryLabel(t, item.id, expenseCatalog)}
-                      selected={budgetCategory === item.id}
-                      onPress={() => setBudgetCategory(item.id)}
-                    />
-                  ))}
-                </View>
-                <DateField label={t('money.budgetMonthLabel')} display="month" value={budgetMonthDate} onChange={setBudgetMonthDate} />
-                <View style={styles.inline}>
-                  <TextInput
-                    value={budgetLimit}
-                    onChangeText={setBudgetLimit}
-                    placeholder={t('money.budgetLimitPlaceholder')}
-                    placeholderTextColor={colors.faint}
-                    keyboardType="decimal-pad"
-                    style={[insetSurface(colors, 16), styles.field, { color: colors.ink }]}
-                  />
-                  <SectionActionButton
-                    icon="checkmark-outline"
-                    label={t('money.saveBudget')}
-                    onPress={() => {
-                      const limit = Number(budgetLimit);
-                      if (!Number.isFinite(limit) || limit <= 0) {
-                        return;
-                      }
-                      const envelope = budgetMonthFromDate(budgetMonthDate);
-                      void upsertBudget({
-                        year: envelope.year,
-                        month: envelope.month,
-                        category: budgetCategory,
-                        limit,
-                        currency,
-                      }).then(() => {
-                        setBudgetLimit('');
-                        return hapticSuccess();
-                      });
-                    }}
-                  />
-                </View>
-              </Section>
-            ) : null}
-
-            {show('cards') ? (
-              <Section
-                title={t('money.billsAndCards')}
-                icon="card-outline"
-                action={t('money.addCard')}
-                actionIcon="card-outline"
-                onAction={() => router.push(appHref('/reminders/card/new'))}
-                colors={colors}
-              >
-                {creditCards.length > 0 ? (
-                  <Pressable
-                    onPress={() => router.push(appHref('/payment-cards'))}
-                    style={[insetSurface(colors, 14), styles.cashbackBanner]}
-                    accessibilityRole="button"
-                    accessibilityLabel={`This month's card cashback: ${formatMoney(totalMonthlyRebates, currency)}`}
-                  >
-                    <Text style={[styles.cashbackBannerText, { color: colors.accent }]}>
-                      {`🎁 This month's card cashback: ${formatMoney(totalMonthlyRebates, currency)}`}
-                    </Text>
-                  </Pressable>
-                ) : null}
-                {bills.length === 0 ? (
-                  <SectionActionButton
-                    icon="flash-outline"
-                    label={t('money.addUtilityBill')}
-                    onPress={() => router.push(appHref('/reminders/new'))}
-                    style={styles.blockAction}
-                  />
-                ) : (
-                  bills.map((item) => (
-                    <Pressable key={item.id} onPress={() => router.push(appHref(`/reminders/${item.id}`))}>
-                      <Row
-                        title={item.title}
-                        meta=""
-                        typeId={item.categoryPath.type ?? item.categoryPath.subcategory ?? 'bills'}
-                        colors={colors}
-                      />
-                    </Pressable>
-                  ))
-                )}
-                <CardHealthList
-                  rows={cardHealth}
-                  onOpenCard={(id) => router.push(appHref(`/reminders/card/${id}`))}
+              </View>
+              <DateField label={t('money.budgetMonthLabel')} display="month" value={budgetMonthDate} onChange={setBudgetMonthDate} />
+              <View style={styles.inline}>
+                <TextInput
+                  value={budgetLimit}
+                  onChangeText={setBudgetLimit}
+                  placeholder={t('money.budgetLimitPlaceholder')}
+                  placeholderTextColor={colors.faint}
+                  keyboardType="decimal-pad"
+                  style={[insetSurface(colors, 16), styles.field, { color: colors.ink }]}
                 />
                 <SectionActionButton
-                  icon="notifications-outline"
-                  label={t('money.allReminders')}
-                  tone="muted"
-                  onPress={() => router.push('/(tabs)/calendar/reminders')}
-                  style={styles.blockAction}
+                  icon="checkmark-outline"
+                  label={t('money.saveBudget')}
+                  onPress={() => {
+                    const limit = Number(budgetLimit);
+                    if (!Number.isFinite(limit) || limit <= 0) {
+                      return;
+                    }
+                    const envelope = budgetMonthFromDate(budgetMonthDate);
+                    void upsertBudget({
+                      year: envelope.year,
+                      month: envelope.month,
+                      category: budgetCategory,
+                      limit,
+                      currency,
+                    }).then(() => {
+                      setBudgetLimit('');
+                      return hapticSuccess();
+                    });
+                  }}
                 />
-              </Section>
-            ) : null}
-          </>
-        ) : (
-          <SectionActionButton
-            icon="options-outline"
-            label={t('money.moreTools')}
-            tone="muted"
-            onPress={() => setOpenExtras(true)}
-            style={styles.moreTap}
-          />
-        )}
-      </ScrollView>
+              </View>
+            </Section>
+          ) : null}
+
+          {show('transfers') ? (
+            <Section
+              title={t('money.transfers')}
+              icon="swap-horizontal-outline"
+              action={t('money.newTransfer')}
+              actionIcon="swap-horizontal-outline"
+              onAction={() => router.push('/transfer/new')}
+              colors={colors}
+            >
+              {transfers.length === 0 ? (
+                <Text style={[styles.meta, { color: colors.faint }]}>{t('money.transfersEmpty')}</Text>
+              ) : (
+                transfers.slice(0, 8).map((item) => (
+                  <Row
+                    key={item.id}
+                    title={formatMoney(item.amount, item.currency)}
+                    meta={`${item.dayKey}${item.note ? ` · ${item.note}` : ''}${item.fee ? ` ${t('money.feeLabel', { amount: formatMoney(item.fee, item.currency) })}` : ''}`}
+                    typeId="transfers"
+                    icon="swap-horizontal-outline"
+                    colors={colors}
+                  />
+                ))
+              )}
+            </Section>
+          ) : null}
+
+          {showExtras ? (
+            <>
+              <GlassSurface style={styles.hero} radius={24}>
+                <Text style={[styles.kicker, { color: colors.faint }]}>{t('money.netPicture')}</Text>
+                <Text style={[styles.heroValue, { color: colors.ink }]}>{formatMoney(net.net, currency)}</Text>
+                <Text style={[styles.meta, { color: colors.muted }]}>
+                  {t('money.have', { amount: formatMoney(net.assets, currency) })} · {t('money.owe', { amount: formatMoney(net.loans, currency) })}
+                  {net.cardDebt ? ` · ${t('money.cardsDebt', { amount: formatMoney(net.cardDebt, currency) })}` : ''}
+                </Text>
+                <Text style={[styles.meta, { color: colors.faint }]}>
+                  {t('money.thisMonthSummary', {
+                    income: formatMoney(snapshot.income, currency),
+                    spent: formatMoney(snapshot.spent, currency),
+                  })}
+                </Text>
+                {net.omittedOtherCurrency ? (
+                  <Text style={[styles.meta, { color: colors.faint }]}>{t('money.otherCurrenciesNote')}</Text>
+                ) : null}
+              </GlassSurface>
+              <SpendTrendBars rows={trend} />
+              <Text style={[styles.meta, { color: colors.faint }]}>{t('money.netWorthComingLater')}</Text>
+            </>
+          ) : (
+            <SectionActionButton
+              icon="options-outline"
+              label={t('money.moreTools')}
+              tone="muted"
+              onPress={() => setOpenExtras(true)}
+              style={styles.moreTap}
+            />
+          )}
+        </ScrollView>
+      ) : null}
+
+      {hub === 'subscriptions' ? <SubscriptionsCockpitScreen embedded /> : null}
+      {hub === 'cards' ? <PaymentCardsScreen embedded /> : null}
+
       <QuickSpendSheet visible={quickSpendOpen} onClose={() => setQuickSpendOpen(false)} />
     </ScreenScaffold>
   );
 }
 
+/**
+ * Purpose: section chrome with optional trailing action for Cashflow lists.
+ * Inputs: title, optional icon/action, theme ink/accent, children.
+ * Outputs: titled block; presentation only.
+ * Side effects: onAction when provided.
+ */
 function Section({
   title,
   icon,
@@ -724,6 +636,12 @@ function Section({
   );
 }
 
+/**
+ * Purpose: one transaction / income / transfer glass row for Cashflow lists.
+ * Inputs: title, meta, optional type icon + card badge, theme colors.
+ * Outputs: GlassSurface row; presentation only.
+ * Side effects: none.
+ */
 function Row({
   title,
   meta,
@@ -754,6 +672,14 @@ function Row({
 }
 
 const styles = StyleSheet.create({
+  chrome: {
+    paddingHorizontal: 20,
+    gap: 12,
+    paddingBottom: 8,
+  },
+  hubScroll: {
+    flex: 1,
+  },
   content: { paddingHorizontal: 20, gap: 12 },
   topRow: {
     flexDirection: 'row',
@@ -781,7 +707,7 @@ const styles = StyleSheet.create({
   lede: { fontFamily: fonts.body, fontSize: 16, lineHeight: 22 },
   hero: { padding: 20, gap: 6 },
   kicker: { fontFamily: fonts.bodySemi, fontSize: 13 },
-  heroValue: { fontFamily: fonts.display, fontSize: 36, lineHeight: 42 },
+  heroValue: { fontFamily: fonts.display, fontSize: 36, lineHeight: 42, fontVariant: ['tabular-nums'] },
   insight: { fontFamily: fonts.body, fontSize: 15, lineHeight: 22, marginTop: 4 },
   insightRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
   meta: { fontFamily: fonts.body, fontSize: 14, lineHeight: 20 },
@@ -792,11 +718,10 @@ const styles = StyleSheet.create({
   headTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 },
   headAction: { flexShrink: 1, minWidth: 0, maxWidth: '48%' },
   section: { fontFamily: fonts.display, fontSize: 22, lineHeight: 28, flex: 1, minWidth: 0 },
-  blockAction: { alignSelf: 'flex-start', maxWidth: '100%' },
   rowCard: { padding: 16, gap: 4, minHeight: 56 },
   rowInner: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   rowCopy: { flex: 1, minWidth: 0, gap: 4 },
-  rowTitle: { fontFamily: fonts.bodySemi, fontSize: 16, lineHeight: 22 },
+  rowTitle: { fontFamily: fonts.bodySemi, fontSize: 16, lineHeight: 22, fontVariant: ['tabular-nums'] },
   inline: { flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' },
   field: { flexGrow: 1, minWidth: 90, minHeight: 44, fontFamily: fonts.body, fontSize: 16, paddingHorizontal: 12, paddingVertical: 10 },
   addSpend: { minHeight: 56, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
@@ -820,14 +745,4 @@ const styles = StyleSheet.create({
   quickSpendLabel: { fontFamily: fonts.bodySemi, fontSize: 16, lineHeight: 22 },
   quickSpendHint: { fontFamily: fonts.body, fontSize: 13, lineHeight: 18 },
   moreTap: { alignSelf: 'center', marginTop: 8 },
-  cashbackBanner: {
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    alignSelf: 'stretch',
-  },
-  cashbackBannerText: {
-    fontFamily: fonts.bodySemi,
-    fontSize: 14,
-    lineHeight: 20,
-  },
 });

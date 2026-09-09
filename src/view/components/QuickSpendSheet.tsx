@@ -1157,6 +1157,7 @@ const styles = StyleSheet.create({
     fontFamily: fonts.display,
     fontWeight: '700',
     textAlign: 'right',
+    fontVariant: ['tabular-nums'],
     width: '100%',
   },
   categoryRow: {

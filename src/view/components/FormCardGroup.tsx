@@ -25,7 +25,7 @@ export interface FormCardProps {
 /**
  * Purpose: standard neumorphic card wrapper used across Halo transactional forms.
  * Inputs: children and optional style overrides.
- * Outputs: raisedSurface(22) container with standard 14pt padding and gap.
+ * Outputs: raisedSurface(22) container with standard 16×14pt padding and gap.
  */
 export function FormCard({ children, style }: FormCardProps) {
   const colors = useThemeColors();
@@ -128,7 +128,7 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: 22, gap: 14 },
   card: {
     gap: 14,
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     paddingVertical: 14,
   },
   stickyBar: {

@@ -1,11 +1,11 @@
-import { HabitStreaksScreen } from '@/view/screens/HabitStreaksScreen';
+import { Redirect } from 'expo-router';
 
 /**
- * Purpose: Expo Router entry for the Habit Streaks & Consistency Heatmap screen.
- * Inputs: none (screen owns providers via the root layout).
- * Outputs: HabitStreaksScreen.
- * Side effects: none.
+ * Purpose: legacy `/habits` deep link — land on Rhythm Consistency segment inside Tab 3.
+ * Inputs: none.
+ * Outputs: redirect into the calendar (rhythm) tab with `tab=streaks`.
+ * Side effects: replace navigation so FloatingTabBar stays visible.
  */
 export default function HabitsRoute() {
-  return <HabitStreaksScreen />;
+  return <Redirect href="/(tabs)/calendar?tab=streaks" />;
 }

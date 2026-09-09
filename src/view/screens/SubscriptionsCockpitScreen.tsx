@@ -34,7 +34,13 @@ import { expenseCategoryLabel, iconForExpenseCategory } from '../icons/typeIcons
 import { useI18n, type Translate } from '../i18n';
 import { useThemeColors } from '../theme/ThemeProvider';
 import { fonts, insetSurface } from '../theme/tokens';
+import { tabScenePaddingBottom } from '../theme/typography';
 import { useTypography } from '../theme/TypographyProvider';
+
+interface SubscriptionsCockpitScreenProps {
+  /** When true, omit ScreenScaffold/header/sticky chrome for embedding in Money hub. */
+  embedded?: boolean;
+}
 
 /**
  * Purpose: format a renewal countdown badge for the upcoming strip.
@@ -89,13 +95,16 @@ function openRecurringComposer(
 
 /**
  * Purpose: Money → Subscriptions cockpit — burn hero, renewal strip, card allocation, full list.
- * Inputs: Finance recurringSpends + logRecurringSpendInstant; Reminder creditCards; settings currency.
- * Outputs: ScreenHeader + scrollable neumorph sections + sticky Add CTA.
+ * Inputs: Finance recurringSpends + logRecurringSpendInstant; Reminder creditCards; settings currency;
+ *   optional `embedded` for Money hub segment (no stack chrome).
+ * Outputs: ScreenHeader + scrollable neumorph sections + sticky Add CTA (standalone), or
+ *   scroll-only body with inline Add CTA when embedded under the floating tab bar.
  * Side effects: navigation; optional 1-tap log via FinanceProvider; success haptic.
  * Design decisions: pure burn/renewal math stays in subscriptionCockpit; View formats and
- *   orchestrates only. Empty list uses EmptyState; sticky PrimaryButton mirrors card edit chrome.
+ *   orchestrates only. Empty list uses EmptyState; sticky PrimaryButton mirrors card edit chrome
+ *   only on the pushed route so the Money tab keeps its floating tab bar.
  */
-export function SubscriptionsCockpitScreen() {
+export function SubscriptionsCockpitScreen({ embedded = false }: SubscriptionsCockpitScreenProps) {
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -155,6 +164,206 @@ export function SubscriptionsCockpitScreen() {
 
   const isEmpty = recurringSpends.length === 0;
 
+  const body = isEmpty ? (
+    <EmptyState
+      message={t('subscriptions.emptyStateHint')}
+      backdropIcon="repeat-outline"
+    />
+  ) : (
+    <>
+      <GlassSurface style={styles.hero} radius={24}>
+        <Text style={[type.footnote, styles.kicker, { color: colors.faint }]}>
+          {t('subscriptions.monthlyBurn')}
+        </Text>
+        <Text style={[styles.heroValue, { color: colors.ink }]}>
+          {formatMoney(summary.totalMonthlyBurn, currency)}
+        </Text>
+        <Text style={[type.subhead, { color: colors.muted }]}>
+          {t('subscriptions.perMonth')}
+        </Text>
+        <View style={styles.heroAnnualRow}>
+          <Text style={[type.footnote, { color: colors.muted }]}>
+            {t('subscriptions.annualBurn')}
+          </Text>
+          <Text style={[type.headline, { color: colors.ink }]}>
+            {formatMoney(summary.totalAnnualBurn, currency)}
+            <Text style={[type.footnote, { color: colors.muted }]}>
+              {' '}
+              {t('subscriptions.perYear')}
+            </Text>
+          </Text>
+        </View>
+        <View style={[insetSurface(colors, 14), styles.activeBadge]}>
+          <Text style={[type.caption, { color: colors.accent }]}>
+            {t('subscriptions.activeSubscriptions', { count: summary.activeCount })}
+          </Text>
+        </View>
+      </GlassSurface>
+
+      {summary.upcomingRenewals.length > 0 ? (
+        <View style={styles.block}>
+          <View style={styles.sectionHead}>
+            <Ionicons name="time-outline" size={18} color={colors.ink} accessible={false} />
+            <Text style={[type.title2, styles.sectionTitle, { color: colors.ink }]}>
+              {t('subscriptions.upcomingRenewals')}
+            </Text>
+          </View>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.renewalRow}
+          >
+            {summary.upcomingRenewals.map((row) => {
+              const title = subscriptionTitle(row.item, t, expenseCatalog);
+              const busy = loggingId === row.item.id;
+              return (
+                <GlassSurface key={row.item.id} style={styles.renewalCard} radius={18}>
+                  <TypeIcon
+                    typeId={row.item.category}
+                    icon={iconForExpenseCategory(row.item.category, expenseCatalog)}
+                  />
+                  <Text style={[type.headline, { color: colors.ink }]} numberOfLines={2}>
+                    {title}
+                  </Text>
+                  <View style={[insetSurface(colors, 12), styles.renewalPill]}>
+                    <Text style={[type.caption, { color: colors.accent }]} numberOfLines={1}>
+                      {renewalBadgeLabel(row.daysUntilRenewal, t)}
+                    </Text>
+                  </View>
+                  {row.cardName ? <SpendCardBadge name={row.cardName} /> : null}
+                  <Pressable
+                    onPress={() => void onLogToday(row.item.id)}
+                    disabled={Boolean(loggingId)}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('subscriptions.logTodayCharge')}
+                    style={({ pressed }) => [
+                      styles.logBtn,
+                      {
+                        backgroundColor: colors.accentSoft,
+                        opacity: busy ? 0.55 : pressed ? 0.8 : 1,
+                        transform: [{ scale: pressed && !busy ? 0.96 : 1 }],
+                      },
+                    ]}
+                  >
+                    <Ionicons name="add" size={16} color={colors.accent} accessible={false} />
+                    <Text style={[type.footnote, styles.logBtnLabel, { color: colors.accent }]}>
+                      {t('subscriptions.logTodayCharge')}
+                    </Text>
+                  </Pressable>
+                </GlassSurface>
+              );
+            })}
+          </ScrollView>
+        </View>
+      ) : null}
+
+      {summary.byCard.length > 0 ? (
+        <View style={styles.block}>
+          <View style={styles.sectionHead}>
+            <Ionicons name="card-outline" size={18} color={colors.ink} accessible={false} />
+            <Text style={[type.title2, styles.sectionTitle, { color: colors.ink }]}>
+              {t('subscriptions.cardAllocation')}
+            </Text>
+          </View>
+          <View style={styles.chipWrap}>
+            {summary.byCard.map((row) => (
+              <View key={row.cardId} style={[insetSurface(colors, 16), styles.cardChip]}>
+                <Text style={[type.headline, { color: colors.ink }]} numberOfLines={1}>
+                  {row.cardName}
+                </Text>
+                <Text style={[type.subhead, { color: colors.muted }]} numberOfLines={1}>
+                  {formatMoney(row.monthlyTotal, currency)}
+                  {t('subscriptions.perMonth')}
+                </Text>
+                <Text style={[type.caption, { color: colors.faint }]}>
+                  {t('subscriptions.activeSubscriptions', { count: row.count })}
+                </Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      ) : null}
+
+      <View style={styles.block}>
+        <View style={styles.sectionHead}>
+          <Ionicons name="repeat-outline" size={18} color={colors.ink} accessible={false} />
+          <Text style={[type.title2, styles.sectionTitle, { color: colors.ink }]}>
+            {t('subscriptions.allSubscriptions')}
+          </Text>
+        </View>
+        <View style={styles.list}>
+          {allRows.map((row) => {
+            const freq = resolveRecurringSpendFrequency(row.item);
+            const title = subscriptionTitle(row.item, t, expenseCatalog);
+            const amountBadge = `${formatMoney(row.item.amount, row.item.currency)} · ${t(`spend.freq.${freq}`)}`;
+            const renewalLabel = formatShortDate(`${row.nextRenewalDate}T12:00:00`, intlLocale);
+            return (
+              <Pressable
+                key={row.item.id}
+                onPress={() => openRecurringComposer(router, row.item)}
+                accessibilityRole="button"
+                accessibilityLabel={title}
+              >
+                <GlassSurface style={styles.rowCard} radius={18}>
+                  <View style={styles.rowInner}>
+                    <TypeIcon
+                      typeId={row.item.category}
+                      icon={iconForExpenseCategory(row.item.category, expenseCatalog)}
+                    />
+                    <View style={styles.rowCopy}>
+                      <Text style={[type.headline, { color: colors.ink }]} numberOfLines={2}>
+                        {title}
+                      </Text>
+                      <View style={[insetSurface(colors, 10), styles.amountPill]}>
+                        <Text style={[type.caption, { color: colors.muted }]} numberOfLines={1}>
+                          {amountBadge}
+                        </Text>
+                      </View>
+                      <Text style={[type.footnote, { color: colors.faint }]} numberOfLines={1}>
+                        {renewalBadgeLabel(row.daysUntilRenewal, t)} · {renewalLabel}
+                      </Text>
+                      {row.cardName ? <SpendCardBadge name={row.cardName} /> : null}
+                    </View>
+                    <Ionicons
+                      name="chevron-forward"
+                      size={18}
+                      color={colors.faint}
+                      accessible={false}
+                    />
+                  </View>
+                </GlassSurface>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+    </>
+  );
+
+  const addCta = (
+    <PrimaryButton
+      icon="add"
+      label={t('subscriptions.addSubscription')}
+      onPress={goAdd}
+    />
+  );
+
+  if (embedded) {
+    return (
+      <KeyboardDismissScrollView
+        style={styles.embeddedScroll}
+        contentContainerStyle={[
+          styles.scroll,
+          { paddingBottom: tabScenePaddingBottom(insets.bottom) },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
+        {body}
+        {addCta}
+      </KeyboardDismissScrollView>
+    );
+  }
+
   return (
     <ScreenScaffold>
       <ScreenHeader
@@ -171,181 +380,7 @@ export function SubscriptionsCockpitScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        {isEmpty ? (
-          <EmptyState
-            message={t('subscriptions.emptyStateHint')}
-            backdropIcon="repeat-outline"
-          />
-        ) : (
-          <>
-            <GlassSurface style={styles.hero} radius={24}>
-              <Text style={[type.footnote, styles.kicker, { color: colors.faint }]}>
-                {t('subscriptions.monthlyBurn')}
-              </Text>
-              <Text style={[styles.heroValue, { color: colors.ink }]}>
-                {formatMoney(summary.totalMonthlyBurn, currency)}
-              </Text>
-              <Text style={[type.subhead, { color: colors.muted }]}>
-                {t('subscriptions.perMonth')}
-              </Text>
-              <View style={styles.heroAnnualRow}>
-                <Text style={[type.footnote, { color: colors.muted }]}>
-                  {t('subscriptions.annualBurn')}
-                </Text>
-                <Text style={[type.headline, { color: colors.ink }]}>
-                  {formatMoney(summary.totalAnnualBurn, currency)}
-                  <Text style={[type.footnote, { color: colors.muted }]}>
-                    {' '}
-                    {t('subscriptions.perYear')}
-                  </Text>
-                </Text>
-              </View>
-              <View style={[insetSurface(colors, 14), styles.activeBadge]}>
-                <Text style={[type.caption, { color: colors.accent }]}>
-                  {t('subscriptions.activeSubscriptions', { count: summary.activeCount })}
-                </Text>
-              </View>
-            </GlassSurface>
-
-            {summary.upcomingRenewals.length > 0 ? (
-              <View style={styles.block}>
-                <View style={styles.sectionHead}>
-                  <Ionicons name="time-outline" size={18} color={colors.ink} accessible={false} />
-                  <Text style={[type.title2, styles.sectionTitle, { color: colors.ink }]}>
-                    {t('subscriptions.upcomingRenewals')}
-                  </Text>
-                </View>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.renewalRow}
-                >
-                  {summary.upcomingRenewals.map((row) => {
-                    const title = subscriptionTitle(row.item, t, expenseCatalog);
-                    const busy = loggingId === row.item.id;
-                    return (
-                      <GlassSurface key={row.item.id} style={styles.renewalCard} radius={18}>
-                        <TypeIcon
-                          typeId={row.item.category}
-                          icon={iconForExpenseCategory(row.item.category, expenseCatalog)}
-                        />
-                        <Text style={[type.headline, { color: colors.ink }]} numberOfLines={2}>
-                          {title}
-                        </Text>
-                        <View style={[insetSurface(colors, 12), styles.renewalPill]}>
-                          <Text style={[type.caption, { color: colors.accent }]} numberOfLines={1}>
-                            {renewalBadgeLabel(row.daysUntilRenewal, t)}
-                          </Text>
-                        </View>
-                        {row.cardName ? <SpendCardBadge name={row.cardName} /> : null}
-                        <Pressable
-                          onPress={() => void onLogToday(row.item.id)}
-                          disabled={Boolean(loggingId)}
-                          accessibilityRole="button"
-                          accessibilityLabel={t('subscriptions.logTodayCharge')}
-                          style={({ pressed }) => [
-                            styles.logBtn,
-                            {
-                              backgroundColor: colors.accentSoft,
-                              opacity: busy ? 0.55 : pressed ? 0.8 : 1,
-                              transform: [{ scale: pressed && !busy ? 0.96 : 1 }],
-                            },
-                          ]}
-                        >
-                          <Ionicons name="add" size={16} color={colors.accent} accessible={false} />
-                          <Text style={[type.footnote, styles.logBtnLabel, { color: colors.accent }]}>
-                            {t('subscriptions.logTodayCharge')}
-                          </Text>
-                        </Pressable>
-                      </GlassSurface>
-                    );
-                  })}
-                </ScrollView>
-              </View>
-            ) : null}
-
-            {summary.byCard.length > 0 ? (
-              <View style={styles.block}>
-                <View style={styles.sectionHead}>
-                  <Ionicons name="card-outline" size={18} color={colors.ink} accessible={false} />
-                  <Text style={[type.title2, styles.sectionTitle, { color: colors.ink }]}>
-                    {t('subscriptions.cardAllocation')}
-                  </Text>
-                </View>
-                <View style={styles.chipWrap}>
-                  {summary.byCard.map((row) => (
-                    <View key={row.cardId} style={[insetSurface(colors, 16), styles.cardChip]}>
-                      <Text style={[type.headline, { color: colors.ink }]} numberOfLines={1}>
-                        {row.cardName}
-                      </Text>
-                      <Text style={[type.subhead, { color: colors.muted }]} numberOfLines={1}>
-                        {formatMoney(row.monthlyTotal, currency)}
-                        {t('subscriptions.perMonth')}
-                      </Text>
-                      <Text style={[type.caption, { color: colors.faint }]}>
-                        {t('subscriptions.activeSubscriptions', { count: row.count })}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
-            ) : null}
-
-            <View style={styles.block}>
-              <View style={styles.sectionHead}>
-                <Ionicons name="repeat-outline" size={18} color={colors.ink} accessible={false} />
-                <Text style={[type.title2, styles.sectionTitle, { color: colors.ink }]}>
-                  {t('subscriptions.allSubscriptions')}
-                </Text>
-              </View>
-              <View style={styles.list}>
-                {allRows.map((row) => {
-                  const freq = resolveRecurringSpendFrequency(row.item);
-                  const title = subscriptionTitle(row.item, t, expenseCatalog);
-                  const amountBadge = `${formatMoney(row.item.amount, row.item.currency)} · ${t(`spend.freq.${freq}`)}`;
-                  const renewalLabel = formatShortDate(`${row.nextRenewalDate}T12:00:00`, intlLocale);
-                  return (
-                    <Pressable
-                      key={row.item.id}
-                      onPress={() => openRecurringComposer(router, row.item)}
-                      accessibilityRole="button"
-                      accessibilityLabel={title}
-                    >
-                      <GlassSurface style={styles.rowCard} radius={18}>
-                        <View style={styles.rowInner}>
-                          <TypeIcon
-                            typeId={row.item.category}
-                            icon={iconForExpenseCategory(row.item.category, expenseCatalog)}
-                          />
-                          <View style={styles.rowCopy}>
-                            <Text style={[type.headline, { color: colors.ink }]} numberOfLines={2}>
-                              {title}
-                            </Text>
-                            <View style={[insetSurface(colors, 10), styles.amountPill]}>
-                              <Text style={[type.caption, { color: colors.muted }]} numberOfLines={1}>
-                                {amountBadge}
-                              </Text>
-                            </View>
-                            <Text style={[type.footnote, { color: colors.faint }]} numberOfLines={1}>
-                              {renewalBadgeLabel(row.daysUntilRenewal, t)} · {renewalLabel}
-                            </Text>
-                            {row.cardName ? <SpendCardBadge name={row.cardName} /> : null}
-                          </View>
-                          <Ionicons
-                            name="chevron-forward"
-                            size={18}
-                            color={colors.faint}
-                            accessible={false}
-                          />
-                        </View>
-                      </GlassSurface>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </View>
-          </>
-        )}
+        {body}
       </KeyboardDismissScrollView>
 
       <View
@@ -358,17 +393,16 @@ export function SubscriptionsCockpitScreen() {
           },
         ]}
       >
-        <PrimaryButton
-          icon="add"
-          label={t('subscriptions.addSubscription')}
-          onPress={goAdd}
-        />
+        {addCta}
       </View>
     </ScreenScaffold>
   );
 }
 
 const styles = StyleSheet.create({
+  embeddedScroll: {
+    flex: 1,
+  },
   scroll: {
     paddingHorizontal: 20,
     gap: 16,
@@ -385,6 +419,7 @@ const styles = StyleSheet.create({
     fontSize: 36,
     lineHeight: 42,
     fontWeight: '700',
+    fontVariant: ['tabular-nums'],
   },
   heroAnnualRow: {
     marginTop: 8,

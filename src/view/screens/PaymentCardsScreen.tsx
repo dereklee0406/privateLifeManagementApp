@@ -41,9 +41,15 @@ import { expenseCategoryLabel, TYPE_ICON_SIZE, type TypeIconName } from '../icon
 import { useI18n, type Translate } from '../i18n';
 import { useThemeColors } from '../theme/ThemeProvider';
 import { fonts, insetSurface, type ThemeColors } from '../theme/tokens';
+import { tabScenePaddingBottom } from '../theme/typography';
 import { useTypography } from '../theme/TypographyProvider';
 
 type CardsViewMode = 'all' | 'bank' | 'promotions';
+
+interface PaymentCardsScreenProps {
+  /** When true, omit ScreenScaffold/header for embedding in Money hub. */
+  embedded?: boolean;
+}
 
 interface ActivePromoRow {
   card: CreditCardAccount;
@@ -56,15 +62,17 @@ interface ActivePromoRow {
 /**
  * Purpose: You → Money → Payment cards — view / add / edit CreditCard accounts with bank
  *   grouping, monthly rebate health, and bank-promotion registration.
- * Inputs: ReminderProvider.creditCards + toggle/upsert; FinanceProvider.expenses; settings currency.
+ * Inputs: ReminderProvider.creditCards + toggle/upsert; FinanceProvider.expenses; settings currency;
+ *   optional `embedded` for Money hub segment (no stack chrome).
  * Outputs: neumorph list with All / By Bank / Promotions segments; Promotions tab can add/edit
- *   promos via PromoEditorModal (+ card picker when multiple cards).
+ *   promos via PromoEditorModal (+ card picker when multiple cards). Standalone wraps
+ *   ScreenScaffold + ScreenHeader; embedded renders scroll body under the floating tab bar.
  * Side effects: navigation; promotion registration/upsert via ReminderProvider; success haptic.
  * Design decisions: pure rebate math stays in creditCardRebates; this View only formats and
  *   orchestrates. Promotions list uses date-window eligibility (not registration) so users can
  *   1-tap register. Cap bar prefers monthlyRebateCap, then monthlySpendCap.
  */
-export function PaymentCardsScreen() {
+export function PaymentCardsScreen({ embedded = false }: PaymentCardsScreenProps) {
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -164,88 +172,88 @@ export function PaymentCardsScreen() {
   const promotionsMode = viewMode === 'promotions';
   const primaryIsAddPromo = promotionsMode && creditCards.length > 0;
 
-  return (
-    <ScreenScaffold>
-      <ScreenHeader title={t('money.paymentCardsTitle')} />
-      <KeyboardDismissScrollView
-        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 28 }]}
-        showsVerticalScrollIndicator={false}
-      >
+  const scrollBody = (
+    <>
+      {embedded ? null : (
         <Text style={[type.subhead, { color: colors.muted }]}>{t('money.paymentCardsLede')}</Text>
+      )}
 
-        <View style={styles.segmentRow}>
-          <Chip
-            label={t('cardRewards.allCards')}
-            selected={viewMode === 'all'}
-            onPress={() => setViewMode('all')}
-          />
-          <Chip
-            label={t('cardRewards.groupByBank')}
-            selected={viewMode === 'bank'}
-            onPress={() => setViewMode('bank')}
-          />
-          <Chip
-            label={t('cardRewards.viewPromotions')}
-            selected={viewMode === 'promotions'}
-            onPress={() => setViewMode('promotions')}
-          />
-        </View>
-
-        {promotionsMode ? (
-          <PromotionsSection
-            rows={activePromos}
-            cardCount={creditCards.length}
-            currency={currency}
-            colors={colors}
-            t={t}
-            onToggle={(cardId, promoId) => {
-              void toggleCardPromotionRegistration(cardId, promoId);
-            }}
-            onEditPromo={openEditPromotion}
-          />
-        ) : creditCards.length === 0 ? (
-          <EmptyState
-            message={t('money.paymentCardsEmpty')}
-            backdropIcon="card-outline"
-          />
-        ) : viewMode === 'bank' ? (
-          <BankGroupedList
-            groups={bankGroups}
-            summaryByCardId={summaryByCardId}
-            currency={currency}
-            colors={colors}
-            t={t}
-            onOpenCard={openCard}
-          />
-        ) : (
-          <View style={styles.list}>
-            {creditCards.map((card) => (
-              <PaymentCardRow
-                key={card.id}
-                card={card}
-                summary={summaryByCardId.get(card.id)}
-                currency={currency}
-                colors={colors}
-                t={t}
-                onPress={() => openCard(card.id)}
-              />
-            ))}
-          </View>
-        )}
-
-        <PrimaryButton
-          icon={primaryIsAddPromo ? 'sparkles-outline' : 'card-outline'}
-          label={primaryIsAddPromo ? t('cardRewards.addPromotion') : t('money.addCard')}
-          onPress={() => {
-            if (primaryIsAddPromo) {
-              startAddPromotion();
-              return;
-            }
-            router.push(appHref('/reminders/card/new'));
-          }}
+      <View style={styles.segmentRow}>
+        <Chip
+          label={t('cardRewards.allCards')}
+          selected={viewMode === 'all'}
+          onPress={() => setViewMode('all')}
         />
-      </KeyboardDismissScrollView>
+        <Chip
+          label={t('cardRewards.groupByBank')}
+          selected={viewMode === 'bank'}
+          onPress={() => setViewMode('bank')}
+        />
+        <Chip
+          label={t('cardRewards.viewPromotions')}
+          selected={viewMode === 'promotions'}
+          onPress={() => setViewMode('promotions')}
+        />
+      </View>
 
+      {promotionsMode ? (
+        <PromotionsSection
+          rows={activePromos}
+          cardCount={creditCards.length}
+          currency={currency}
+          colors={colors}
+          t={t}
+          onToggle={(cardId, promoId) => {
+            void toggleCardPromotionRegistration(cardId, promoId);
+          }}
+          onEditPromo={openEditPromotion}
+        />
+      ) : creditCards.length === 0 ? (
+        <EmptyState
+          message={t('money.paymentCardsEmpty')}
+          backdropIcon="card-outline"
+        />
+      ) : viewMode === 'bank' ? (
+        <BankGroupedList
+          groups={bankGroups}
+          summaryByCardId={summaryByCardId}
+          currency={currency}
+          colors={colors}
+          t={t}
+          onOpenCard={openCard}
+        />
+      ) : (
+        <View style={styles.list}>
+          {creditCards.map((card) => (
+            <PaymentCardRow
+              key={card.id}
+              card={card}
+              summary={summaryByCardId.get(card.id)}
+              currency={currency}
+              colors={colors}
+              t={t}
+              onPress={() => openCard(card.id)}
+            />
+          ))}
+        </View>
+      )}
+
+      <PrimaryButton
+        icon={primaryIsAddPromo ? 'sparkles-outline' : 'card-outline'}
+        label={primaryIsAddPromo ? t('cardRewards.addPromotion') : t('money.addCard')}
+        onPress={() => {
+          if (primaryIsAddPromo) {
+            startAddPromotion();
+            return;
+          }
+          router.push(appHref('/reminders/card/new'));
+        }}
+      />
+    </>
+  );
+
+  const modals = (
+    <>
       <CardPickerForPromoModal
         visible={cardPickerOpen}
         cards={creditCards}
@@ -265,6 +273,37 @@ export function PaymentCardsScreen() {
           void savePromotion(promo);
         }}
       />
+    </>
+  );
+
+  if (embedded) {
+    return (
+      <>
+        <KeyboardDismissScrollView
+          style={styles.embeddedScroll}
+          contentContainerStyle={[
+            styles.content,
+            { paddingBottom: tabScenePaddingBottom(insets.bottom) },
+          ]}
+          showsVerticalScrollIndicator={false}
+        >
+          {scrollBody}
+        </KeyboardDismissScrollView>
+        {modals}
+      </>
+    );
+  }
+
+  return (
+    <ScreenScaffold>
+      <ScreenHeader title={t('money.paymentCardsTitle')} />
+      <KeyboardDismissScrollView
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 28 }]}
+        showsVerticalScrollIndicator={false}
+      >
+        {scrollBody}
+      </KeyboardDismissScrollView>
+      {modals}
     </ScreenScaffold>
   );
 }
@@ -916,6 +955,9 @@ function promoCountdownLabel(daysLeft: number, t: Translate): string {
 }
 
 const styles = StyleSheet.create({
+  embeddedScroll: {
+    flex: 1,
+  },
   content: {
     paddingHorizontal: 20,
     gap: 14,

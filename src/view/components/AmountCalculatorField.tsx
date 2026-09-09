@@ -530,8 +530,8 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodySemi,
     letterSpacing: 0.6,
   },
-  amount: { fontFamily: fonts.display, fontWeight: '700', textAlign: 'right' },
-  preview: { fontFamily: fonts.bodyMedium, marginTop: 2, textAlign: 'right' },
+  amount: { fontFamily: fonts.display, fontWeight: '700', textAlign: 'right', fontVariant: ['tabular-nums'] },
+  preview: { fontFamily: fonts.bodyMedium, marginTop: 2, textAlign: 'right', fontVariant: ['tabular-nums'] },
   amountHit: {
     width: '100%',
     paddingVertical: 2,

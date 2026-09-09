@@ -15,6 +15,7 @@ import { useI18n } from '../i18n';
 import { EmptyState } from '../components/EmptyState';
 import { EntryCard } from '../components/EntryCard';
 import { GroupedRow, GroupedSection } from '../components/GroupedList';
+import { HubSegmentControl, type HubSegmentOption } from '../components/HubSegmentControl';
 import { LargeTitle } from '../components/LargeTitle';
 import { ScreenScaffold } from '../components/ScreenScaffold';
 import { SearchFilters } from '../components/SearchFilters';
@@ -23,6 +24,9 @@ import { iconIdForReminder, type TypeIconName } from '../icons/typeIcons';
 import { useThemeColors } from '../theme/ThemeProvider';
 import { fonts, raisedSurface } from '../theme/tokens';
 import { tabScenePaddingBottom, type } from '../theme/typography';
+import { JournalCalendarView } from './journal/JournalCalendarView';
+
+type JournalViewMode = 'timeline' | 'calendar';
 
 const KIND_CHIPS: Array<{ id: GlobalSearchFilter; label: string; icon: TypeIconName }> = [
   { id: 'all', label: 'All', icon: 'apps-outline' },
@@ -32,10 +36,12 @@ const KIND_CHIPS: Array<{ id: GlobalSearchFilter; label: string; icon: TypeIconN
 ];
 
 /**
- * Purpose: Pages timeline plus one global search over pages, reminders, and spends.
- * Inputs: journal, reminders, finance; local filter form state.
- * Outputs: editorial header, timeline when All/Pages is idle; mixed hits when she types or picks Reminders/Money.
- * Side effects: navigation only (compose for write). Filtering lives in Model. Spend hits open that spend to edit.
+ * Purpose: Journal hub — chronological timeline or calendar date companion in one tab.
+ * Inputs: journal, reminders, finance; local view mode + filter form state.
+ * Outputs: editorial header, HubSegmentControl (Timeline / Calendar), mode-specific canvas.
+ * Side effects: navigation only (compose / entry / reminder / spend). Filtering lives in Model.
+ * Design decisions: Calendar month grid extracted to JournalCalendarView; Timeline keeps
+ *   kind chips + SearchFilters. CalendarScreen remains as a standalone fallback.
  */
 export function JournalScreen() {
   const colors = useThemeColors();
@@ -45,8 +51,17 @@ export function JournalScreen() {
   const { timelineFor, entries } = useJournal();
   const { reminders } = useReminders();
   const { expenses } = useFinance();
+  const [viewMode, setViewMode] = useState<JournalViewMode>('timeline');
   const [query, setQuery] = useState(emptySearchInput());
   const [filter, setFilter] = useState<GlobalSearchFilter>('all');
+
+  const viewOptions = useMemo(
+    (): HubSegmentOption<JournalViewMode>[] => [
+      { id: 'timeline', label: t('journal.viewTimeline'), icon: 'time-outline' },
+      { id: 'calendar', label: t('journal.viewCalendar'), icon: 'calendar-outline' },
+    ],
+    [t],
+  );
 
   const sections = useMemo(() => timelineFor(query), [timelineFor, query]);
   const showGlobal =
@@ -128,80 +143,89 @@ export function JournalScreen() {
             <Ionicons name="create-outline" size={20} color={colors.ink} accessible={false} importantForAccessibility="no" />
           </Pressable>
         </View>
-        <View style={styles.kinds}>
-          {KIND_CHIPS.map((item) => (
-            <Chip
-              key={item.id}
-              icon={item.icon}
-              label={
-                item.id === 'all'
-                  ? t('common.all')
-                  : item.id === 'pages'
-                    ? t('pages.title')
-                    : item.id === 'reminders'
-                      ? t('pages.reminders')
-                      : t('pages.money')
-              }
-              selected={filter === item.id}
-              onPress={() => setFilter(item.id)}
-            />
-          ))}
-        </View>
-        <SearchFilters value={query} onChange={setQuery} />
-        {showGlobal ? (
-          hits.length === 0 ? (
-            <EmptyState
-              message={
-                query.keywords.trim()
-                  ? t('pages.emptySearch')
-                  : t('pages.emptyBrowse')
-              }
-              actionLabel={query.keywords.trim() ? undefined : t('pages.writePage')}
-              actionIcon={query.keywords.trim() ? undefined : 'create-outline'}
-              onAction={query.keywords.trim() ? undefined : () => router.push('/compose?mode=text')}
-            />
-          ) : (
-            <GroupedSection>
-              {hits.map((hit) => {
-                const reminder = hit.kind === 'reminder' ? reminders.find((row) => row.id === hit.id) : undefined;
-                const expense = hit.kind === 'spend' ? expenses.find((row) => row.id === hit.id) : undefined;
-                const typeId = reminder
-                  ? iconIdForReminder(reminder.categoryPath, reminder.templateId)
-                  : expense?.category;
-                const snippet =
-                  expense
-                    ? [expense.note, expense.dayKey].filter(Boolean).join(' · ')
-                    : hit.snippet;
-                return (
-                  <GroupedRow
-                    key={`${hit.kind}-${hit.id}`}
-                    leading={typeId ? <TypeIcon typeId={typeId} /> : undefined}
-                    title={hit.title}
-                    subtitle={snippet ? `${kindLabel(hit.kind)} · ${snippet}` : kindLabel(hit.kind)}
-                    onPress={() => openHit(hit)}
-                    chevron
-                  />
-                );
-              })}
-            </GroupedSection>
-          )
-        ) : sections.length === 0 ? (
-          <View style={styles.emptyBlock}>
-            <EmptyState
-              message={searching ? t('pages.emptyFilter') : t('pages.emptyTimeline')}
-              actionLabel={searching ? undefined : t('pages.writePage')}
-              actionIcon={searching ? undefined : 'create-outline'}
-              onAction={searching ? undefined : () => router.push('/compose?mode=text')}
-            />
-          </View>
+
+        <HubSegmentControl options={viewOptions} value={viewMode} onChange={setViewMode} />
+
+        {viewMode === 'calendar' ? (
+          <JournalCalendarView />
         ) : (
-          sections.map((section) => (
-            <GroupedSection key={section.bucket} header={section.label}>
-              {section.entries.map((entry) => (
-                <EntryCard key={entry.id} entry={entry} grouped onPress={() => router.push(`/entry/${entry.id}`)} />
+          <>
+            <View style={styles.kinds}>
+              {KIND_CHIPS.map((item) => (
+                <Chip
+                  key={item.id}
+                  icon={item.icon}
+                  label={
+                    item.id === 'all'
+                      ? t('common.all')
+                      : item.id === 'pages'
+                        ? t('pages.title')
+                        : item.id === 'reminders'
+                          ? t('pages.reminders')
+                          : t('pages.money')
+                  }
+                  selected={filter === item.id}
+                  onPress={() => setFilter(item.id)}
+                />
               ))}
-            </GroupedSection>
-          ))
+            </View>
+            <SearchFilters value={query} onChange={setQuery} />
+            {showGlobal ? (
+              hits.length === 0 ? (
+                <EmptyState
+                  message={
+                    query.keywords.trim()
+                      ? t('pages.emptySearch')
+                      : t('pages.emptyBrowse')
+                  }
+                  actionLabel={query.keywords.trim() ? undefined : t('pages.writePage')}
+                  actionIcon={query.keywords.trim() ? undefined : 'create-outline'}
+                  onAction={query.keywords.trim() ? undefined : () => router.push('/compose?mode=text')}
+                />
+              ) : (
+                <GroupedSection>
+                  {hits.map((hit) => {
+                    const reminder = hit.kind === 'reminder' ? reminders.find((row) => row.id === hit.id) : undefined;
+                    const expense = hit.kind === 'spend' ? expenses.find((row) => row.id === hit.id) : undefined;
+                    const typeId = reminder
+                      ? iconIdForReminder(reminder.categoryPath, reminder.templateId)
+                      : expense?.category;
+                    const snippet =
+                      expense
+                        ? [expense.note, expense.dayKey].filter(Boolean).join(' · ')
+                        : hit.snippet;
+                    return (
+                      <GroupedRow
+                        key={`${hit.kind}-${hit.id}`}
+                        leading={typeId ? <TypeIcon typeId={typeId} /> : undefined}
+                        title={hit.title}
+                        subtitle={snippet ? `${kindLabel(hit.kind)} · ${snippet}` : kindLabel(hit.kind)}
+                        onPress={() => openHit(hit)}
+                        chevron
+                      />
+                    );
+                  })}
+                </GroupedSection>
+              )
+            ) : sections.length === 0 ? (
+              <View style={styles.emptyBlock}>
+                <EmptyState
+                  message={searching ? t('pages.emptyFilter') : t('pages.emptyTimeline')}
+                  actionLabel={searching ? undefined : t('pages.writePage')}
+                  actionIcon={searching ? undefined : 'create-outline'}
+                  onAction={searching ? undefined : () => router.push('/compose?mode=text')}
+                />
+              </View>
+            ) : (
+              sections.map((section) => (
+                <GroupedSection key={section.bucket} header={section.label}>
+                  {section.entries.map((entry) => (
+                    <EntryCard key={entry.id} entry={entry} grouped onPress={() => router.push(`/entry/${entry.id}`)} />
+                  ))}
+                </GroupedSection>
+              ))
+            )}
+          </>
         )}
       </ScrollView>
     </ScreenScaffold>

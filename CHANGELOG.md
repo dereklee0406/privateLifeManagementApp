@@ -2,6 +2,38 @@
 
 ## 2026-09-09
 - Date: 2026-09-09
+- Description: **Comprehensive UX/UI Architecture & Navigation Overhaul (Phases 1–4)** — Completed the Halo information-architecture and design-system roadmap from the product UX audit:
+  1. **Rhythm Hub (Tab 3)** — Consolidated Reminders + Habit Streaks into `RhythmScreen` with `Tasks & Due` vs `Consistency` segments; legacy `/reminders`, `/habits`, and `calendar/reminders` deep-link into the hub.
+  2. **Money Hub (Tab 4)** — Restructured into a 3-segment financial home (`Cashflow` / `Subscriptions` / `Cards & Rewards`) via shared `HubSegmentControl`; Subscriptions Cockpit and Payment Cards embed in-tab so the floating tab bar stays visible.
+  3. **Journal + Calendar Companion (Tab 2)** — Integrated month-grid calendar into `JournalScreen` as `Timeline` vs `Calendar` with activity dots, day detail, and empty-day quick actions (`JournalCalendarView`).
+  4. **Design-system polish** — Applied `fontVariant: ['tabular-nums']` across calculator wells (`AmountCalculatorField`, `QuickSpendSheet`), Money / Subscriptions hero amounts, and amount row titles; standardized `FormCard` padding to 16×14pt; unified Rhythm segment control onto shared `HubSegmentControl` for tactile parity with Money and Journal. Verification: `npm test` 60/60 pass; `npx tsc --noEmit` clean.
+- Affected modules: View (`RhythmScreen.tsx`, `MoneyScreen.tsx`, `JournalScreen.tsx`, `HubSegmentControl.tsx`, `FormCardGroup.tsx`, `AmountCalculatorField.tsx`, `QuickSpendSheet.tsx`, `SubscriptionsCockpitScreen.tsx`, rhythm/journal panels); Routes (tabs layouts, legacy redirects); i18n (en / zh-Hant / zh-Hans / ja); CHANGELOG
+- Reason: UX/IA + Design System — eliminate navigation fragmentation, keep tab-bar orientation, and stop monetary digit jitter during edit/FX conversion
+- Impact: High
+
+## 2026-09-09
+- Date: 2026-09-09
+- Description: **Journal + Calendar Companion View** — Integrated the month-grid calendar into `JournalScreen` as a neumorphic 2-segment hub (`Timeline` / `Calendar`) via `HubSegmentControl`. Timeline keeps kind filter chips, `SearchFilters`, chronological groups, and global search hits. Calendar mode adds month navigation, 7×weeks activity dots (mood / reminder / spend), selected-day entries with photo thumbs, due reminders, logged spends, empty-day quick actions, and jump-to-today with light haptic. Extracted `JournalCalendarView` under `screens/journal/`. `CalendarScreen` retained as a compile-safe fallback. New i18n: `journal.viewTimeline`, `journal.viewCalendar`, `journal.dayEvents`, `journal.emptyDay` with 100% parity across en / zh-Hant / zh-Hans / ja.
+- Affected modules: View (`JournalScreen.tsx`, `journal/JournalCalendarView.tsx`); Routes (`app/(tabs)/calendar/index.tsx` comment); i18n (`en.ts`, `zh-Hant.ts`, `zh-Hans.ts`, `ja.ts`); CHANGELOG
+- Reason: UX/IA — re-anchor Calendar as Journal companion for date-based memory browsing (Apple Journal / Day One pattern)
+- Impact: High
+
+## 2026-09-09
+- Date: 2026-09-09
+- Description: **Money Hub 3-Segment Restructure** — Refactored `MoneyScreen` from an overcrowded vertical scroll into a neumorphic 3-segment financial hub (`Cashflow` / `Subscriptions` / `Cards & Rewards`) via shared `HubSegmentControl`. Cashflow keeps spent hero, Add Spend / Quick Spend, Transfer + Income actions, focus chips (All / Income / Spends / Budgets / Transfers), and transaction/budget/transfer lists. Subscriptions Cockpit and Payment Cards embed in-tab (`embedded` prop) so the floating tab bar stays visible; standalone `/subscriptions` and `/payment-cards` routes remain. Deep-link support via `?segment=subscriptions|cards`. i18n: `money.tabCashflow`, `money.tabSubscriptions`, `money.tabCards` across all 4 locales.
+- Affected modules: View (`MoneyScreen.tsx`, `HubSegmentControl.tsx`, `SubscriptionsCockpitScreen.tsx`, `PaymentCardsScreen.tsx`); i18n (`en.ts`, `zh-Hant.ts`, `zh-Hans.ts`, `ja.ts`); CHANGELOG
+- Reason: UX/IA — consolidate orphaned finance stack screens into Tab 4 without losing tab-bar orientation
+- Impact: High
+
+## 2026-09-09
+- Date: 2026-09-09
+- Description: **Rhythm & Habits Hub (Tab 3)** — Consolidated Reminders list and 90-day Habit Streaks heatmap into a unified `RhythmScreen` under main Tab 3. Two-segment control: Tasks & Due (category filters, upcoming groups, completed-today undo) vs Consistency (heatmap matrix, rhythm summary, streak cards with 1-tap check-in). Tab bar label/icon updated to `tabs.rhythm` / checkbox. Legacy routes (`/reminders`, `/habits`, `calendar/reminders`) redirect or render the hub. Calendar month view screen preserved for Journal companion work. New `rhythm.*` i18n keys with 100% parity across en / zh-Hant / zh-Hans / ja.
+- Affected modules: View (`RhythmScreen.tsx`, `rhythm/RhythmTasksPanel.tsx`, `rhythm/RhythmStreaksPanel.tsx`, `RemindersScreen.tsx`, `HabitStreaksScreen.tsx`, `FloatingTabBar.tsx`); Routes (`app/(tabs)/calendar/*`, `app/habits.tsx`, `app/reminders/index.tsx`, `app/(tabs)/_layout.tsx`); i18n (`en.ts`, `zh-Hant.ts`, `zh-Hans.ts`, `ja.ts`); CHANGELOG
+- Reason: UX Information Architecture — eliminate context-switching between reminders management and habit consistency analysis
+- Impact: High
+
+## 2026-09-09
+- Date: 2026-09-09
 - Description: **Root Tab Editorial Headers** — Replaced plain one-word tab titles (`Pages`, `Calendar`, `Money`, `You`/`Settings`) with a cohesive editorial lockup matching Home: accented kicker + hero `LargeTitle` + tactile 44pt circular action/status. Journal gains a write (`create-outline`) shortcut to `/compose?mode=text`; Calendar uses dynamic `month.heading` with jump-to-today (`today-outline` + haptic); Money opens Quick Spend (`flash-outline`); Settings shows an on-device privacy shield badge. New i18n keys with 100% parity across `en`, `zh-Hant`, `zh-Hans`, `ja`.
 - Affected modules: View (`JournalScreen.tsx`, `CalendarScreen.tsx`, `MoneyScreen.tsx`, `SettingsScreen.tsx`); i18n (`en.ts`, `zh-Hant.ts`, `zh-Hans.ts`, `ja.ts`); CHANGELOG
 - Reason: UX/UI Enhancement — remove generic tab-label headers and align all primary tabs with Home’s editorial date lockup system

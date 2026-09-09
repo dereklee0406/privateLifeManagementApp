@@ -1,8 +1,11 @@
-import { CalendarScreen } from '@/view/screens/CalendarScreen';
+import { RhythmScreen } from '@/view/screens/RhythmScreen';
 
 /**
- * Purpose: Calendar tab route (month and day agenda).
+ * Purpose: Tab 3 landing — Habits & Rhythm hub (tasks + consistency).
+ * Inputs: none. Month-grid calendar lives in Journal (Timeline / Calendar companion).
+ * Outputs: RhythmScreen.
+ * Side effects: none.
  */
 export default function CalendarRoute() {
-  return <CalendarScreen />;
+  return <RhythmScreen />;
 }
