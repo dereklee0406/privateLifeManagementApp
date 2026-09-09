@@ -111,6 +111,13 @@ export function CreditCardEditScreen() {
   const [rewardType, setRewardType] = useState<CardRewardType>(account?.rewardType ?? 'cashback');
   const [baseRebateRate, setBaseRebateRate] = useState(account?.baseRebateRate ?? 0.004);
   const [baseRateDraft, setBaseRateDraft] = useState(formatPercentInput(account?.baseRebateRate ?? 0.004));
+  const [billingCycleType, setBillingCycleType] = useState<'calendar' | 'statement'>(
+    account?.billingCycleType ?? 'calendar',
+  );
+  const [fxFeeDraft, setFxFeeDraft] = useState(formatPercentInput(account?.fxFeeRate ?? 0.0195));
+  const [milesConversionRate, setMilesConversionRate] = useState(
+    account?.milesConversionRate !== undefined ? String(account.milesConversionRate) : '',
+  );
   const [rebateRules, setRebateRules] = useState<CardRebateRule[]>(() => [...(account?.rebateRules ?? [])]);
   const [monthlySpendCap, setMonthlySpendCap] = useState(
     account?.monthlySpendCap !== undefined ? String(account.monthlySpendCap) : '',
@@ -161,6 +168,11 @@ export function CreditCardEditScreen() {
     setRewardType(account.rewardType ?? 'cashback');
     setBaseRebateRate(account.baseRebateRate ?? 0.004);
     setBaseRateDraft(formatPercentInput(account.baseRebateRate ?? 0.004));
+    setBillingCycleType(account.billingCycleType ?? 'calendar');
+    setFxFeeDraft(formatPercentInput(account.fxFeeRate ?? 0.0195));
+    setMilesConversionRate(
+      account.milesConversionRate !== undefined ? String(account.milesConversionRate) : '',
+    );
     setRebateRules([...(account.rebateRules ?? [])]);
     setMonthlySpendCap(account.monthlySpendCap !== undefined ? String(account.monthlySpendCap) : '');
     setMonthlyRebateCap(account.monthlyRebateCap !== undefined ? String(account.monthlyRebateCap) : '');
@@ -173,16 +185,24 @@ export function CreditCardEditScreen() {
   const amountDue = useMemo(() => parseOptionalNumber(amount), [amount]);
   const currentBalance = useMemo(() => parseOptionalNumber(balance), [balance]);
 
+  const fxFeeRate = useMemo(() => {
+    const parsed = Number(fxFeeDraft);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed / 100 : 0.0195;
+  }, [fxFeeDraft]);
+
   const draftCard = useMemo(
     () => ({
       name: name.trim() || t('money.card'),
       dueDayOfMonth: dueDay,
       statementDayOfMonth: statementDay,
+      billingCycleType,
       bankId,
       bankName: bankName.trim() || bankDisplayName(t, bankId),
       cardTier: cardTier.trim() || undefined,
       rewardType,
       baseRebateRate,
+      fxFeeRate,
+      milesConversionRate: parseOptionalNumber(milesConversionRate),
       rebateRules,
       monthlySpendCap: parseOptionalNumber(monthlySpendCap),
       monthlyRebateCap: parseOptionalNumber(monthlyRebateCap),
@@ -193,11 +213,14 @@ export function CreditCardEditScreen() {
       name,
       dueDay,
       statementDay,
+      billingCycleType,
       bankId,
       bankName,
       cardTier,
       rewardType,
       baseRebateRate,
+      fxFeeRate,
+      milesConversionRate,
       rebateRules,
       monthlySpendCap,
       monthlyRebateCap,
@@ -250,6 +273,7 @@ export function CreditCardEditScreen() {
         name: name.trim() || t('money.card'),
         dueDayOfMonth: dueDay,
         statementDayOfMonth: statementDay,
+        billingCycleType,
         amountDue,
         currentBalance,
         bankId,
@@ -257,6 +281,8 @@ export function CreditCardEditScreen() {
         cardTier: cardTier.trim() || undefined,
         rewardType,
         baseRebateRate,
+        fxFeeRate,
+        milesConversionRate: parseOptionalNumber(milesConversionRate),
         rebateRules,
         monthlySpendCap: parseOptionalNumber(monthlySpendCap),
         monthlyRebateCap: parseOptionalNumber(monthlyRebateCap),
@@ -513,6 +539,52 @@ export function CreditCardEditScreen() {
             />
 
             <View style={styles.fieldGroup}>
+              <Text style={[styles.label, { color: colors.faint }]}>{t('cardRewards.billingCycleType')}</Text>
+              <View style={styles.chipWrap}>
+                <Chip
+                  label={t('cardRewards.cycleTypeCalendar')}
+                  selected={billingCycleType === 'calendar'}
+                  onPress={() => setBillingCycleType('calendar')}
+                />
+                <Chip
+                  label={t('cardRewards.cycleTypeStatement')}
+                  selected={billingCycleType === 'statement'}
+                  onPress={() => setBillingCycleType('statement')}
+                />
+              </View>
+            </View>
+
+            <View style={styles.fieldGroup}>
+              <Text style={[styles.label, { color: colors.faint }]}>{t('cardRewards.fxFeeRate')}</Text>
+              <View style={styles.chipWrap}>
+                <Chip
+                  label={t('cardRewards.fxFeeZero')}
+                  selected={nearlyEqual(fxFeeRate, 0)}
+                  onPress={() => setFxFeeDraft('0')}
+                />
+                <Chip
+                  label={t('cardRewards.fxFeeStandard')}
+                  selected={nearlyEqual(fxFeeRate, 0.0195)}
+                  onPress={() => setFxFeeDraft('1.95')}
+                />
+              </View>
+              <View style={[insetSurface(colors, 16), styles.affixWell]}>
+                <TextInput
+                  value={fxFeeDraft}
+                  onChangeText={setFxFeeDraft}
+                  placeholder="1.95"
+                  placeholderTextColor={colors.faint}
+                  keyboardType="decimal-pad"
+                  style={[styles.affixInput, { color: colors.ink }]}
+                  accessibilityLabel={t('cardRewards.fxFeeRate')}
+                />
+                <View style={[styles.affixBadge, { backgroundColor: colors.accentSoft }]}>
+                  <Text style={[styles.affixBadgeText, { color: colors.accent }]}>%</Text>
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.fieldGroup}>
               <Text style={[styles.label, { color: colors.faint }]}>{t('money.amountDueOptional')}</Text>
               <TextInput
                 value={amount}
@@ -561,6 +633,17 @@ export function CreditCardEditScreen() {
                 ))}
               </View>
             </View>
+
+            {rewardType === 'miles' ? (
+              <OptionalNumberField
+                label={t('cardRewards.milesRate')}
+                value={milesConversionRate}
+                onChangeText={setMilesConversionRate}
+                colors={colors}
+                currency={settings.defaultCurrency}
+                placeholder={t('cardRewards.milesRatePlaceholder')}
+              />
+            ) : null}
 
             <View style={styles.fieldGroup}>
               <Text style={[styles.label, { color: colors.faint }]}>{t('cardRewards.baseRebateRate')}</Text>
@@ -738,7 +821,11 @@ export function CreditCardEditScreen() {
                         {promo.title.trim() || t('cardRewards.editPromotion')}
                       </Text>
                       <Text style={[styles.meta, { color: colors.muted }]}>
-                        +{formatPercentInput(promo.extraRebateRate)}% · {promo.startDate} → {promo.endDate}
+                        {promo.category ? `${categoryLabel(t, promo.category)} · ` : ''}+{formatPercentInput(promo.extraRebateRate)}% · {promo.startDate} → {promo.endDate}
+                        {promo.minSpendPerTx ? ` · ${t('cardRewards.promoMinSpendBadge', { amount: formatFriendlyMoney(promo.minSpendPerTx, settings.defaultCurrency) })}` : ''}
+                        {promo.minTotalSpend ? ` · ${t('cardRewards.promoMinTotalBadge', { amount: formatFriendlyMoney(promo.minTotalSpend, settings.defaultCurrency) })}` : ''}
+                        {promo.maxRebateCap ? ` · ${t('cardRewards.promoCapBadge', { amount: formatFriendlyMoney(promo.maxRebateCap, settings.defaultCurrency) })}` : ''}
+                        {promo.maxSpendCap ? ` · ${t('cardRewards.promoSpendCapBadge', { amount: formatFriendlyMoney(promo.maxSpendCap, settings.defaultCurrency) })}` : ''}
                       </Text>
                     </Pressable>
                     <TextButton

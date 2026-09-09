@@ -44,9 +44,19 @@ export interface CardBankPromotion {
   startDate: string;
   /** YYYY-MM-DD */
   endDate: string;
+  /** Lower limit: minimum spend per single transaction to qualify. */
   minSpendPerTx?: number;
+  /** Lower limit: minimum accumulated total spend during promo window to unlock. */
   minTotalSpend?: number;
+  /** Upper limit: maximum eligible spend subject to the extra rebate. */
+  maxSpendCap?: number;
+  /** Upper limit: maximum rebate cash/miles dollar amount payable. */
   maxRebateCap?: number;
+  /**
+   * When true, this promo stacks additively with other stackable promos.
+   * Standalone promos (false/undefined) compete for the single highest benefit.
+   */
+  isStackable?: boolean;
   requiresRegistration: boolean;
   isRegistered: boolean;
   termsNote?: string;
@@ -65,6 +75,12 @@ export interface CreditCardAccount {
   name: string;
   dueDayOfMonth: number;
   statementDayOfMonth: number;
+  /**
+   * Cap / spend window for rebate math.
+   * - `calendar` (default): 1st through last day of the civil month.
+   * - `statement`: statementDay+1 of prior cycle through statementDay.
+   */
+  billingCycleType?: 'calendar' | 'statement';
   amountDue?: number;
   /** Optional outstanding balance treated as debt in net worth. */
   currentBalance?: number;
@@ -77,6 +93,16 @@ export interface CreditCardAccount {
   rewardType?: CardRewardType;
   /** Default fraction when no category rule matches (e.g. 0.004 = 0.4%). */
   baseRebateRate?: number;
+  /**
+   * Foreign-transaction fee fraction (e.g. 0.0195 = 1.95%).
+   * Undefined means the engine default of 1.95%; set 0 for fee-free travel cards.
+   */
+  fxFeeRate?: number;
+  /**
+   * Home-currency dollars per reward unit when rewardType is miles
+   * (e.g. 4 → HK$4 = 1 mile).
+   */
+  milesConversionRate?: number;
   rebateRules?: CardRebateRule[];
   monthlySpendCap?: number;
   monthlyRebateCap?: number;

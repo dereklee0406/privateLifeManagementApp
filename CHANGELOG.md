@@ -2,6 +2,36 @@
 
 ## 2026-09-09
 - Date: 2026-09-09
+- Description: **Subscriptions Cockpit & Habit Consistency Heatmap** — Implemented two core privacy life management pillars: (1) **Subscriptions & Recurring Contract Cockpit** (`subscriptionCockpit.ts`, `SubscriptionsCockpitScreen.tsx`, route `app/subscriptions.tsx`) providing monthly burn rate, annual projections, upcoming 14-day renewal countdowns with 1-tap spend logging, paying credit card allocation, and category breakdowns; (2) **Habit Streaks & Consistency Heatmap** (`habitStreaks.ts`, `HabitStreaksScreen.tsx`, route `app/habits.tsx`) providing 90-day tactile rhythm matrix (7×13 grid), filterable All Habits vs single-habit density views, flame streak badges (`🔥 14 days`), best streak records, 30-day consistency analytics, and 1-tap check-in toggles; (3) **Navigation & i18n Integration** with registered routes in `app/_layout.tsx`, navigation entry chips in `MoneyScreen.tsx` and `RemindersScreen.tsx`, and 31 new localized strings with 100% key parity across `en.ts`, `zh-Hant.ts`, `zh-Hans.ts`, and `ja.ts`.
+- Affected modules: Model (`subscriptionCockpit.ts`, `subscriptionCockpit.test.ts`, `habitStreaks.ts`, `habitStreaks.test.ts`); View (`SubscriptionsCockpitScreen.tsx`, `HabitStreaksScreen.tsx`, `MoneyScreen.tsx`, `RemindersScreen.tsx`); Routes (`app/subscriptions.tsx`, `app/habits.tsx`, `app/_layout.tsx`); i18n (`en.ts`, `zh-Hant.ts`, `zh-Hans.ts`, `ja.ts`); CHANGELOG
+- Reason: Feature Implementation — deliver privacy-first personal subscriptions management and habit consistency tracking with 100% on-device data sovereignty
+- Impact: High
+
+## 2026-09-09
+
+## 2026-09-09
+- Date: 2026-09-09
+- Description: **Credit Card Calculation Engine Comprehensive Upgrade** — Full architectural overhaul of rebate engine: (1) Added configurable billing statement cycles vs calendar month (`billingCycleType`) with `getCardBillingCycleWindow` date clamping; (2) Multi-currency foreign spend normalization via FX table with net yield accounting, foreign transaction fee deduction (`fxFeeRate`, default 1.95%, 0% fee-free preset), and auto-matching of `overseas` rules; (3) Multi-promotion stacking (`isStackable`), combining additive promos with best standalone promos; (4) Miles/points reward unit conversions (`milesConversionRate`); (5) Upgraded `findBestCardForSpend` ranking by net yield and near-threshold unlock alerts (≤ HK$500); (6) Card & Promo editor enhancements with cycle chips, FX fee presets, and stackable toggles; (7) Glanceable cycle and stackable badges across `PaymentCardsScreen` and live net yield breakdown in `ExpenseEditScreen`; (8) 100% key parity across all 4 locales.
+- Affected modules: Model (`creditCards.ts`, `normalizeReminder.ts`, `creditCardRebates.ts`, `creditCardRebates.test.ts`); View (`CreditCardEditScreen.tsx`, `PromoEditorModal.tsx`, `ExpenseEditScreen.tsx`, `PaymentCardsScreen.tsx`); i18n (`en.ts`, `zh-Hant.ts`, `zh-Hans.ts`, `ja.ts`); CHANGELOG
+- Reason: Feature Enhancement & Domain Architecture — high-precision real-world credit card reward calculations, foreign fee deduction, and billing cycle alignment
+- Impact: High
+
+## 2026-09-09
+- Date: 2026-09-09
+- Description: **Credit Card Promotions: Lower & Upper Limits Configuration** — Enhanced bank promotion management and domain rebate calculations to fully configure and enforce both Lower Limits (minimum spend per transaction `minSpendPerTx`, minimum total accumulated spend `minTotalSpend`) and Upper Limits (maximum rebate cap `maxRebateCap`, maximum eligible spend cap `maxSpendCap`). Upgraded `PromoEditorModal` with category selection chips and dedicated structured sections for spend requirements and reward caps. Surfaced glanceable limit badges across `PaymentCardsScreen` and `CreditCardEditScreen` with full 4-locale i18n support.
+- Affected modules: Model (`creditCards.ts`, `normalizeReminder.ts`, `creditCardRebates.ts`, `creditCardRebates.test.ts`); View (`PromoEditorModal.tsx`, `PaymentCardsScreen.tsx`, `CreditCardEditScreen.tsx`); i18n (`en.ts`, `zh-Hant.ts`, `zh-Hans.ts`, `ja.ts`); CHANGELOG
+- Reason: Feature Enhancement — support real-world bank promotion spend requirements (lower limits) and reward/spend caps (upper limits)
+- Impact: Medium
+
+## 2026-09-09
+- Date: 2026-09-09
+- Description: **PaymentCardsScreen UI Polish: Eradicate Duplicate Action Buttons** — Eliminated duplicate stacked "Add promotion" clay buttons on the Promotions tab when no promotions are configured. The empty state `GlassSurface` now acts as a clean informative card (icon + description), while the primary action CTA remains unified at the bottom of the screen. Similarly cleaned up `EmptyState` on the "All Cards" tab to prevent duplicate "Add a card" buttons.
+- Affected modules: View (`PaymentCardsScreen.tsx`); CHANGELOG
+- Reason: UX/UI Bug Fix — remove redundant duplicate action buttons and align empty state layout
+- Impact: Low
+
+## 2026-09-09
+- Date: 2026-09-09
 - Description: **Add & Manage Card Promotions Directly from PaymentCardsScreen** — Promotions tab now supports 1-tap add/edit of bank promotions via shared `PromoEditorModal`, multi-card `CardPickerForPromoModal`, upgraded empty state, and mode-aware primary CTA (Add promotion vs Add a card).
 - Affected modules: View (`PaymentCardsScreen.tsx`, `CreditCardEditScreen.tsx`, `PromoEditorModal.tsx`, `CardPickerForPromoModal.tsx`); i18n (`en.ts`, `zh-Hant.ts`, `zh-Hans.ts`, `ja.ts`); CHANGELOG
 - Reason: UX/UI — allow 1-tap promotion addition and card selection from Promotions tab

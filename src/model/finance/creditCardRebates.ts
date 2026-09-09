@@ -4,7 +4,16 @@ import type {
   CardRewardType,
   CreditCardAccount,
 } from '../reminders/creditCards';
+import type { MoneyCurrency } from '../settings/AppSettings';
 import { toDayKey } from '../../utils/dateUtils';
+import { convertAmount, type FxRateTable } from './fx';
+
+/** Default card FX fee when card.fxFeeRate is unset (1.95%). */
+const DEFAULT_FX_FEE_RATE = 0.0195;
+/** Default home currency for rebate math when card has no currency field. */
+const DEFAULT_CARD_CURRENCY: MoneyCurrency = 'HKD';
+/** Near-threshold window for min-monthly-spend unlock hints. */
+const MIN_SPEND_NEAR_THRESHOLD = 500;
 
 /** Recognized issuing-bank catalog id. */
 export type BuiltinBankId =
@@ -65,16 +74,31 @@ export interface PopularCardPreset {
  * Side effects: none.
  */
 export interface RebateCalculationResult {
+  /** Gross rebate (base + bonus + promo); kept for backward compatibility. */
   rebateAmount: number;
   effectiveRate: number;
   baseRebate: number;
   bonusRebate: number;
   promoRebate: number;
+  /** Same as rebateAmount (gross) before FX fee. */
+  grossRebateAmount: number;
+  /** Card foreign-transaction fee in home currency (0 when same-currency). */
+  fxFeeAmount: number;
+  /** max(0, gross − FX fee). */
+  netRebateAmount: number;
+  /** netRebateAmount / homeAmount. */
+  netEffectiveRate: number;
   isCapExceeded: boolean;
   capRemaining?: number;
   explanation: string;
   matchedRuleId?: string;
+  /** Best / primary promo id (backward compatible). */
   matchedPromoId?: string;
+  /** All applied promo ids (stackable + winning standalone). */
+  matchedPromoIds?: string[];
+  /** Miles/points earned when card.rewardType + milesConversionRate apply. */
+  rewardUnits?: number;
+  rewardUnitLabel?: string;
 }
 
 /**
@@ -460,36 +484,134 @@ function toCivilDayKey(date: Date | string): string {
 }
 
 /**
- * Purpose: YYYY-MM month key from a civil day key.
- * Inputs: YYYY-MM-DD.
- * Outputs: YYYY-MM.
+ * Purpose: pad month/day to two digits for civil date strings.
+ * Inputs: 1–31 (or year fragment).
+ * Outputs: zero-padded string.
  * Side effects: none.
  */
-function monthKeyFromDay(dayKey: string): string {
-  return dayKey.slice(0, 7);
+function pad2(value: number): string {
+  return value < 10 ? `0${value}` : String(value);
 }
 
 /**
- * Purpose: filter expenses belonging to a card in the same calendar month as dayKey.
- * Inputs: card id, month day key, expense rows.
- * Outputs: matching expense rows with finite positive amounts.
+ * Purpose: days in a civil month (handles leap years).
+ * Inputs: year, month 1–12.
+ * Outputs: 28–31.
  * Side effects: none.
  */
+function daysInMonth(year: number, month: number): number {
+  return new Date(year, month, 0).getDate();
+}
+
+/**
+ * Purpose: clamp a day-of-month into a real calendar day for that month.
+ * Inputs: year, month 1–12, desired day 1–31.
+ * Outputs: 1..daysInMonth.
+ * Side effects: none.
+ */
+function clampDayOfMonth(year: number, month: number, day: number): number {
+  return Math.min(Math.max(1, day), daysInMonth(year, month));
+}
+
+/**
+ * Purpose: build YYYY-MM-DD with day clamped to the month length.
+ * Inputs: year, month 1–12, day 1–31.
+ * Outputs: civil day key.
+ * Side effects: none.
+ */
+function civilDate(year: number, month: number, day: number): string {
+  return `${year}-${pad2(month)}-${pad2(clampDayOfMonth(year, month, day))}`;
+}
+
+/**
+ * Purpose: shift a year/month by delta months.
+ * Inputs: year, month 1–12, signed month delta.
+ * Outputs: normalized year/month.
+ * Side effects: none.
+ */
+function addMonths(year: number, month: number, delta: number): { year: number; month: number } {
+  const index = year * 12 + (month - 1) + delta;
+  return { year: Math.floor(index / 12), month: (index % 12) + 1 };
+}
+
+/**
+ * Purpose: start day after statement day, rolling to the 1st of the next month when needed.
+ * Inputs: year/month of the statement month, statement day 1–31.
+ * Outputs: civil day key for statementDay+1 (clamped / overflow-safe).
+ * Side effects: none.
+ * Design decisions: statementDay 31 in a 30-day month → next month's 1st.
+ */
+function dayAfterStatement(year: number, month: number, statementDay: number): string {
+  const nextDay = statementDay + 1;
+  if (nextDay > daysInMonth(year, month)) {
+    const next = addMonths(year, month, 1);
+    return civilDate(next.year, next.month, 1);
+  }
+  return civilDate(year, month, nextDay);
+}
+
+/**
+ * Purpose: resolve the active billing cycle window for a card on a spend day.
+ * Inputs: card (billingCycleType + statementDayOfMonth), civil dayKey.
+ * Outputs: inclusive { startDate, endDate } as YYYY-MM-DD.
+ * Side effects: none.
+ * Design decisions: `calendar` (default) = 1st..month-end; `statement` uses statementDay
+ *   with short-month clamping (Feb 28/29, 30-day months).
+ */
+export function getCardBillingCycleWindow(
+  card: CreditCardAccount,
+  dayKey: string,
+): { startDate: string; endDate: string } {
+  const year = Number(dayKey.slice(0, 4));
+  const month = Number(dayKey.slice(5, 7));
+  const day = Number(dayKey.slice(8, 10));
+
+  if (card.billingCycleType === 'statement') {
+    const statementDay = Math.min(31, Math.max(1, Math.floor(card.statementDayOfMonth) || 1));
+    if (day <= statementDay) {
+      const prev = addMonths(year, month, -1);
+      return {
+        startDate: dayAfterStatement(prev.year, prev.month, statementDay),
+        endDate: civilDate(year, month, statementDay),
+      };
+    }
+    const next = addMonths(year, month, 1);
+    return {
+      startDate: dayAfterStatement(year, month, statementDay),
+      endDate: civilDate(next.year, next.month, statementDay),
+    };
+  }
+
+  return {
+    startDate: civilDate(year, month, 1),
+    endDate: civilDate(year, month, daysInMonth(year, month)),
+  };
+}
+
+/**
+ * Purpose: filter expenses belonging to a card in the card's active billing cycle for dayKey.
+ * Inputs: card, spend day key, expense rows.
+ * Outputs: matching expense rows with finite positive amounts inside [startDate, endDate].
+ * Side effects: none.
+ * Design decisions: rows without dayKey remain included (legacy MTD bags already scoped).
+ */
 function expensesForCardMonth(
-  cardId: string,
+  card: CreditCardAccount,
   dayKey: string,
   monthlyExpenses: RebateExpenseLike[],
 ): RebateExpenseLike[] {
-  const monthKey = monthKeyFromDay(dayKey);
+  const { startDate, endDate } = getCardBillingCycleWindow(card, dayKey);
   return monthlyExpenses.filter((expense) => {
-    if (expense.cardId !== cardId) {
+    if (expense.cardId !== card.id) {
       return false;
     }
     if (!Number.isFinite(expense.amount) || expense.amount <= 0) {
       return false;
     }
-    if (expense.dayKey && monthKeyFromDay(expense.dayKey) !== monthKey) {
-      return false;
+    if (expense.dayKey) {
+      if (expense.dayKey < startDate || expense.dayKey > endDate) {
+        return false;
+      }
     }
     return true;
   });
@@ -576,7 +698,8 @@ function estimatedPromoRebateUsed(
     return expense.category.trim().toLowerCase() === promo.category.trim().toLowerCase();
   });
   const spend = sumSpend(eligible);
-  const raw = spend * promo.extraRebateRate;
+  const cappedSpend = promo.maxSpendCap !== undefined ? Math.min(spend, promo.maxSpendCap) : spend;
+  const raw = cappedSpend * promo.extraRebateRate;
   if (promo.maxRebateCap !== undefined) {
     return Math.min(raw, promo.maxRebateCap);
   }
@@ -585,12 +708,12 @@ function estimatedPromoRebateUsed(
 
 /**
  * Purpose: compute rebate dollars for one prospective spend on one card.
- * Inputs: card, amount, category, date, month-to-date expenses (may include other cards).
- * Outputs: RebateCalculationResult with base/bonus/promo split and cap flags.
+ * Inputs: card, amount, category, date, month-to-date expenses; optional spend currency + FX table.
+ * Outputs: RebateCalculationResult with base/bonus/promo split, net yield, and cap flags.
  * Side effects: none.
- * Design decisions: when a category spend/rebate cap is partially consumed, the current
- *   amount is split into bonus-eligible vs base-only portions; card-level monthlyRebateCap
- *   clamps the total after promo stacking.
+ * Design decisions: foreign amounts convert to card home currency (default HKD) with feeRate 0
+ *   for cap/threshold math; card FX fee is deducted separately into netRebateAmount.
+ *   Stackable promos add; standalone promos take the single best. rebateAmount === grossRebateAmount.
  */
 export function calculateTransactionRebate(
   card: CreditCardAccount,
@@ -598,18 +721,32 @@ export function calculateTransactionRebate(
   category: string,
   date: Date | string,
   monthlyExpenses: RebateExpenseLike[],
+  currency?: MoneyCurrency,
+  fxTable?: FxRateTable | null,
 ): RebateCalculationResult {
   const safeAmount = Number.isFinite(amount) && amount > 0 ? amount : 0;
   const dayKey = toCivilDayKey(date);
+  const cardCurrency = DEFAULT_CARD_CURRENCY;
+  const spendCurrency = currency ?? cardCurrency;
+  const isForeign = spendCurrency !== cardCurrency;
+  const converted =
+    isForeign && safeAmount > 0
+      ? convertAmount(safeAmount, spendCurrency, cardCurrency, fxTable, 0)
+      : safeAmount;
+  const homeAmount =
+    typeof converted === 'number' && Number.isFinite(converted) && converted > 0
+      ? converted
+      : safeAmount;
+
   const baseRate =
     typeof card.baseRebateRate === 'number' &&
     Number.isFinite(card.baseRebateRate) &&
     card.baseRebateRate >= 0
       ? card.baseRebateRate
       : 0.004;
-  const prior = expensesForCardMonth(card.id, dayKey, monthlyExpenses);
+  const prior = expensesForCardMonth(card, dayKey, monthlyExpenses);
   const priorSpend = sumSpend(prior);
-  const cumulativeSpend = priorSpend + safeAmount;
+  const cumulativeSpend = priorSpend + homeAmount;
   const meetsMinMonthly =
     card.minMonthlySpendRequirement === undefined ||
     cumulativeSpend >= card.minMonthlySpendRequirement;
@@ -620,26 +757,44 @@ export function calculateTransactionRebate(
     baseRebate: 0,
     bonusRebate: 0,
     promoRebate: 0,
+    grossRebateAmount: 0,
+    fxFeeAmount: 0,
+    netRebateAmount: 0,
+    netEffectiveRate: 0,
     isCapExceeded: false,
     explanation,
+    matchedPromoIds: [],
   });
 
-  if (safeAmount <= 0) {
+  if (safeAmount <= 0 || homeAmount <= 0) {
     return empty('No spend amount.');
   }
 
   let matchedRule = findMatchingRule(card.rebateRules, category);
-  if (matchedRule?.minSpendPerTx && safeAmount < matchedRule.minSpendPerTx) {
+  const exactCategoryMatch =
+    !!matchedRule &&
+    matchedRule.category.trim().toLowerCase() === (category.trim().toLowerCase() || 'other');
+  if (matchedRule?.minSpendPerTx && homeAmount < matchedRule.minSpendPerTx) {
     matchedRule = undefined;
   }
   if (!meetsMinMonthly) {
     matchedRule = undefined;
   }
 
+  // Foreign spend with no category-specific bonus → auto-match overseas rule when present.
+  if ((!matchedRule || !exactCategoryMatch) && isForeign && meetsMinMonthly) {
+    const overseas = (card.rebateRules ?? []).find(
+      (rule) => rule.category.trim().toLowerCase() === 'overseas',
+    );
+    if (overseas && !(overseas.minSpendPerTx && homeAmount < overseas.minSpendPerTx)) {
+      matchedRule = overseas;
+    }
+  }
+
   const bonusRate = matchedRule && matchedRule.rebateRate > baseRate ? matchedRule.rebateRate : 0;
   const useBonus = bonusRate > 0;
 
-  let bonusEligibleAmount = useBonus ? safeAmount : 0;
+  let bonusEligibleAmount = useBonus ? homeAmount : 0;
   let isCapExceeded = false;
   let capRemaining: number | undefined;
 
@@ -663,12 +818,12 @@ export function calculateTransactionRebate(
       if (remainingSpend <= 0) {
         bonusEligibleAmount = 0;
         isCapExceeded = true;
-      } else if (safeAmount > remainingSpend) {
+      } else if (homeAmount > remainingSpend) {
         bonusEligibleAmount = remainingSpend;
         isCapExceeded = true;
         capRemaining = 0;
       } else {
-        capRemaining = remainingSpend - safeAmount;
+        capRemaining = remainingSpend - homeAmount;
       }
     }
 
@@ -702,39 +857,84 @@ export function calculateTransactionRebate(
     }
   }
 
-  const baseRebate = roundMoney(safeAmount * baseRate);
+  const baseRebate = roundMoney(homeAmount * baseRate);
   const bonusRebate = useBonus
     ? roundMoney(bonusEligibleAmount * (bonusRate - baseRate))
     : 0;
 
-  let promoRebate = 0;
-  let matchedPromoId: string | undefined;
   const promotions = card.promotions ?? [];
-  for (const promo of promotions) {
-    if (!isPromotionActiveOnDay(promo, dayKey, category)) {
-      continue;
-    }
-    if (promo.minSpendPerTx && safeAmount < promo.minSpendPerTx) {
-      continue;
+  const activePromos = promotions.filter((promo) => isPromotionActiveOnDay(promo, dayKey, category));
+  const stackablePromos = activePromos.filter((promo) => promo.isStackable === true);
+  const standalonePromos = activePromos.filter((promo) => promo.isStackable !== true);
+
+  /**
+   * Purpose: evaluate one promo's extra rebate for this spend, respecting its limits.
+   * Inputs: promo + prior cycle expenses + home amount.
+   * Outputs: applied rebate dollars (0 when gates fail).
+   * Side effects: none.
+   */
+  const evaluatePromo = (promo: CardBankPromotion): number => {
+    if (promo.minSpendPerTx && homeAmount < promo.minSpendPerTx) {
+      return 0;
     }
     if (promo.minTotalSpend && cumulativeSpend < promo.minTotalSpend) {
-      continue;
+      return 0;
     }
     const used = estimatedPromoRebateUsed(promo, prior);
     const remaining =
       promo.maxRebateCap !== undefined ? Math.max(0, promo.maxRebateCap - used) : Number.POSITIVE_INFINITY;
     if (remaining <= 0) {
-      continue;
+      return 0;
     }
-    const raw = safeAmount * promo.extraRebateRate;
-    const applied = roundMoney(Math.min(raw, remaining));
-    if (applied > promoRebate) {
-      promoRebate = applied;
-      matchedPromoId = promo.id;
+    let eligibleSpend = homeAmount;
+    if (promo.maxSpendCap !== undefined) {
+      const priorPromoSpend = sumSpend(
+        prior.filter((expense) => {
+          if (promo.minSpendPerTx && expense.amount < promo.minSpendPerTx) {
+            return false;
+          }
+          if (!promo.category || promo.category.trim().toLowerCase() === 'all') {
+            return true;
+          }
+          return expense.category.trim().toLowerCase() === promo.category.trim().toLowerCase();
+        }),
+      );
+      const remainingSpend = Math.max(0, promo.maxSpendCap - priorPromoSpend);
+      eligibleSpend = Math.min(eligibleSpend, remainingSpend);
+    }
+    if (eligibleSpend <= 0) {
+      return 0;
+    }
+    const raw = eligibleSpend * promo.extraRebateRate;
+    return roundMoney(Math.min(raw, remaining));
+  };
+
+  let promoRebate = 0;
+  const matchedPromoIds: string[] = [];
+  for (const promo of stackablePromos) {
+    const applied = evaluatePromo(promo);
+    if (applied > 0) {
+      promoRebate = roundMoney(promoRebate + applied);
+      matchedPromoIds.push(promo.id);
     }
   }
 
-  let rebateAmount = roundMoney(baseRebate + bonusRebate + promoRebate);
+  let bestStandaloneId: string | undefined;
+  let bestStandaloneRebate = 0;
+  for (const promo of standalonePromos) {
+    const applied = evaluatePromo(promo);
+    if (applied > bestStandaloneRebate) {
+      bestStandaloneRebate = applied;
+      bestStandaloneId = promo.id;
+    }
+  }
+  if (bestStandaloneId && bestStandaloneRebate > 0) {
+    promoRebate = roundMoney(promoRebate + bestStandaloneRebate);
+    matchedPromoIds.push(bestStandaloneId);
+  }
+  const matchedPromoId = matchedPromoIds[0];
+
+  let grossRebateAmount = roundMoney(baseRebate + bonusRebate + promoRebate);
   if (card.monthlyRebateCap !== undefined) {
     const priorTotalRebate = prior.reduce((total, expense) => {
       const result = calculateTransactionRebate(
@@ -747,16 +947,36 @@ export function calculateTransactionRebate(
       return total + result.rebateAmount;
     }, 0);
     const room = Math.max(0, card.monthlyRebateCap - priorTotalRebate);
-    if (rebateAmount > room) {
-      rebateAmount = roundMoney(room);
+    if (grossRebateAmount > room) {
+      grossRebateAmount = roundMoney(room);
       isCapExceeded = true;
       capRemaining = 0;
     } else if (capRemaining === undefined) {
-      capRemaining = roundMoney(room - rebateAmount);
+      capRemaining = roundMoney(room - grossRebateAmount);
     }
   }
 
-  const effectiveRate = safeAmount > 0 ? rebateAmount / safeAmount : 0;
+  const fxFeeRate =
+    typeof card.fxFeeRate === 'number' && Number.isFinite(card.fxFeeRate) && card.fxFeeRate >= 0
+      ? card.fxFeeRate
+      : DEFAULT_FX_FEE_RATE;
+  const fxFeeAmount = isForeign ? roundMoney(homeAmount * fxFeeRate) : 0;
+  const rebateAmount = grossRebateAmount;
+  const netRebateAmount = Math.max(0, roundMoney(grossRebateAmount - fxFeeAmount));
+  const effectiveRate = homeAmount > 0 ? rebateAmount / homeAmount : 0;
+  const netEffectiveRate = homeAmount > 0 ? netRebateAmount / homeAmount : 0;
+
+  let rewardUnits: number | undefined;
+  let rewardUnitLabel: string | undefined;
+  if (
+    card.rewardType === 'miles' &&
+    typeof card.milesConversionRate === 'number' &&
+    card.milesConversionRate > 0
+  ) {
+    rewardUnits = Math.floor(homeAmount / card.milesConversionRate);
+    rewardUnitLabel = 'miles';
+  }
+
   const parts: string[] = [];
   if (bonusRebate > 0 && matchedRule) {
     parts.push(
@@ -766,13 +986,24 @@ export function calculateTransactionRebate(
     parts.push(`${formatPercent(baseRate)} base`);
   }
   if (promoRebate > 0) {
-    parts.push(`+${formatPercent(promoRebate / safeAmount)} promo`);
+    parts.push(`+${formatPercent(promoRebate / homeAmount)} promo`);
+  }
+  if (isForeign && fxFeeAmount > 0) {
+    parts.push(`FX fee −${formatPercent(fxFeeRate)}`);
+  }
+  if (isForeign) {
+    parts.push(`net ${formatPercent(netEffectiveRate)}`);
   }
   if (isCapExceeded && bonusRebate <= 0) {
     parts.push('cap reached');
   }
   if (!meetsMinMonthly && card.minMonthlySpendRequirement) {
-    parts.push(`need HK$${card.minMonthlySpendRequirement} monthly spend`);
+    const remaining = roundMoney(card.minMonthlySpendRequirement - priorSpend);
+    if (remaining > 0 && remaining <= MIN_SPEND_NEAR_THRESHOLD) {
+      parts.push(`HK$${remaining} from unlocking bonus`);
+    } else {
+      parts.push(`need HK$${card.minMonthlySpendRequirement} monthly spend`);
+    }
   }
 
   return {
@@ -781,11 +1012,18 @@ export function calculateTransactionRebate(
     baseRebate,
     bonusRebate,
     promoRebate,
+    grossRebateAmount,
+    fxFeeAmount,
+    netRebateAmount,
+    netEffectiveRate,
     isCapExceeded,
     capRemaining,
     explanation: parts.join(' · '),
     matchedRuleId: matchedRule?.id,
     matchedPromoId,
+    matchedPromoIds,
+    rewardUnits,
+    rewardUnitLabel,
   };
 }
 
@@ -801,7 +1039,7 @@ export function calculateCardMonthlyRebateSummary(
 ): CardMonthlyRebateSummary {
   const todayKey = toDayKey(new Date());
   const rows = expensesForCardMonth(
-    card.id,
+    card,
     todayKey,
     monthlyExpenses.map((expense) => ({ ...expense, dayKey: todayKey })),
   );
@@ -875,10 +1113,12 @@ export function calculateCardMonthlyRebateSummary(
 }
 
 /**
- * Purpose: rank cards by rebate for a prospective spend and return the winner.
- * Inputs: cards, amount, category, date, month expenses.
+ * Purpose: rank cards by net rebate for a prospective spend and return the winner.
+ * Inputs: cards, amount, category, date, month expenses; optional spend currency + FX table.
  * Outputs: best card + result, optional runner-up; null when no cards.
  * Side effects: none.
+ * Design decisions: ranks by netRebateAmount so 0% FX fee cards win on foreign spend;
+ *   ties break on netEffectiveRate then gross rebateAmount.
  */
 export function findBestCardForSpend(
   cards: CreditCardAccount[],
@@ -886,6 +1126,8 @@ export function findBestCardForSpend(
   category: string,
   date: Date | string,
   monthlyExpenses: RebateExpenseLike[],
+  currency?: MoneyCurrency,
+  fxTable?: FxRateTable | null,
 ): {
   bestCard: CreditCardAccount;
   result: RebateCalculationResult;
@@ -897,14 +1139,26 @@ export function findBestCardForSpend(
   const ranked = cards
     .map((card) => ({
       card,
-      result: calculateTransactionRebate(card, amount, category, date, monthlyExpenses),
+      result: calculateTransactionRebate(
+        card,
+        amount,
+        category,
+        date,
+        monthlyExpenses,
+        currency,
+        fxTable,
+      ),
     }))
     .sort((left, right) => {
-      const rebateDelta = right.result.rebateAmount - left.result.rebateAmount;
-      if (rebateDelta !== 0) {
-        return rebateDelta;
+      const netDelta = right.result.netRebateAmount - left.result.netRebateAmount;
+      if (netDelta !== 0) {
+        return netDelta;
       }
-      return right.result.effectiveRate - left.result.effectiveRate;
+      const netRateDelta = right.result.netEffectiveRate - left.result.netEffectiveRate;
+      if (netRateDelta !== 0) {
+        return netRateDelta;
+      }
+      return right.result.rebateAmount - left.result.rebateAmount;
     });
   const best = ranked[0];
   const second = ranked[1];

@@ -193,29 +193,39 @@ export function ExpenseEditScreen() {
   );
   /**
    * Purpose: rank payment cards by rebate for the current amount/category/date.
-   * Inputs: creditCards, parsedAmount, category, dayKey, expenses.
+   * Inputs: creditCards, parsedAmount, category, dayKey, expenses, currency, fx.
    * Outputs: best card + rebate result, or null when amount is zero / no cards.
    * Side effects: none.
+   * Design decisions: currency + FX table so foreign spend ranks by net yield (0% vs 1.95% fee).
    */
   const recommendation = useMemo(
     () =>
       parsedAmount > 0
-        ? findBestCardForSpend(creditCards, parsedAmount, category, dayKey, expenses)
+        ? findBestCardForSpend(creditCards, parsedAmount, category, dayKey, expenses, currency, fx)
         : null,
-    [creditCards, parsedAmount, category, dayKey, expenses],
+    [creditCards, parsedAmount, category, dayKey, expenses, currency, fx],
   );
   /**
    * Purpose: live rebate preview for the card currently selected in Paid with.
-   * Inputs: selectedCard, parsedAmount, category, dayKey, expenses.
+   * Inputs: selectedCard, parsedAmount, category, dayKey, expenses, currency, fx.
    * Outputs: RebateCalculationResult or null when no card / zero amount.
    * Side effects: none.
+   * Design decisions: currency + FX table so preview shows FX fee and net yield on foreign spend.
    */
   const rebatePreview = useMemo(
     () =>
       selectedCard && parsedAmount > 0
-        ? calculateTransactionRebate(selectedCard, parsedAmount, category, dayKey, expenses)
+        ? calculateTransactionRebate(
+            selectedCard,
+            parsedAmount,
+            category,
+            dayKey,
+            expenses,
+            currency,
+            fx,
+          )
         : null,
-    [selectedCard, parsedAmount, category, dayKey, expenses],
+    [selectedCard, parsedAmount, category, dayKey, expenses, currency, fx],
   );
   /** Core active categories for the compact 4×2 visual grid (icon + short label). */
   const compactCategories = useMemo(() => activeCategories.slice(0, 8), [activeCategories]);
@@ -740,6 +750,34 @@ export function ExpenseEditScreen() {
                         ? ` · Cap left: ${formatMoney(rebatePreview.capRemaining, currency)}`
                         : ''}
                     </Text>
+                    {rebatePreview.fxFeeAmount && rebatePreview.fxFeeAmount > 0 ? (
+                      <>
+                        <Text style={[styles.rebatePreviewText, { color: colors.accent, marginTop: 4 }]}>
+                          {t('cardRewards.netYieldLine', {
+                            rate: formatRatePercent(rebatePreview.netEffectiveRate * 100),
+                            amount: formatFriendlyMoney(
+                              rebatePreview.netRebateAmount,
+                              settings.defaultCurrency,
+                            ),
+                          })}
+                        </Text>
+                        <Text style={[styles.rebatePreviewText, { color: colors.muted, marginTop: 2 }]}>
+                          {t('cardRewards.fxFeeDeduction', {
+                            amount: formatFriendlyMoney(
+                              rebatePreview.fxFeeAmount,
+                              settings.defaultCurrency,
+                            ),
+                          })}
+                        </Text>
+                      </>
+                    ) : null}
+                    {rebatePreview.rewardUnits && rebatePreview.rewardUnitLabel ? (
+                      <Text style={[styles.rebatePreviewText, { color: colors.muted, marginTop: 4 }]}>
+                        {rebatePreview.rewardUnitLabel === 'points'
+                          ? t('cardRewards.rewardUnitPoints', { count: rebatePreview.rewardUnits })
+                          : t('cardRewards.rewardUnitMiles', { count: rebatePreview.rewardUnits })}
+                      </Text>
+                    ) : null}
                   </View>
                 ) : null}
                 {creditCards.length === 0 ? (
@@ -887,6 +925,20 @@ export function ExpenseEditScreen() {
             </FormCard>
     </FormCardGroup>
   );
+}
+
+/**
+ * Purpose: trim trailing zeros on percent labels (5, 1.5, 0.4).
+ * Inputs: percent number (already ×100).
+ * Outputs: compact string without % sign.
+ * Side effects: none.
+ */
+function formatRatePercent(rate: number): string {
+  if (!Number.isFinite(rate)) {
+    return '0';
+  }
+  const rounded = Math.round(rate * 100) / 100;
+  return Number.isInteger(rounded) ? String(rounded) : String(rounded);
 }
 
 const styles = StyleSheet.create({

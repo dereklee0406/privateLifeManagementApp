@@ -120,6 +120,12 @@ export function RemindersScreen() {
         ) : null}
 
         <View style={styles.filters}>
+          <Chip
+            icon="flame-outline"
+            label={t('habits.streaksTitle')}
+            selected={false}
+            onPress={() => router.push('/habits')}
+          />
           <Chip label={t('common.all')} selected={top === 'all'} onPress={() => setTop('all')} />
           {topCategories.map((node) => (
             <Chip

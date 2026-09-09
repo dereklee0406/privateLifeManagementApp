@@ -8,6 +8,8 @@ import { useI18n } from '../i18n';
 import { useThemeColors } from '../theme/ThemeProvider';
 import { fonts, insetSurface } from '../theme/tokens';
 import { type } from '../theme/typography';
+import { CardPresetModal, categoryLabel } from './CardPresetModal';
+import { Chip } from './Chip';
 import { DateField } from './DateField';
 import { PrimaryButton } from './PrimaryButton';
 import { SheetChrome } from './SheetChrome';
@@ -21,36 +23,60 @@ export interface PromoEditorModalProps {
   onSave: (promo: CardBankPromotion) => void;
 }
 
+const PROMO_CATEGORIES = [
+  'all',
+  'dining',
+  'online',
+  'supermarket',
+  'travel',
+  'shopping',
+  'overseas',
+  'transport',
+  'entertainment',
+  'bills',
+  'other',
+] as const;
+
 /**
  * Purpose: reusable sheet modal for creating/editing a CardBankPromotion.
  * Inputs: draft promo or null; display currency; optional card name; close/save callbacks.
- * Outputs: title, extra rate %, date range, registration toggles, optional rebate cap.
+ * Outputs: title, category, extra rate %, date range, registration, stackable flag, lower limits & upper limits.
  * Side effects: none besides onClose / onSave.
- * Design decisions: promotion windows are civil YYYY-MM-DD via DateField; currency badge on
- *   the cap field matches formatFriendlyMoney symbols used elsewhere in money UI.
+ * Design decisions: structured sections clearly distinguish lower limits (min spend per tx / total spend)
+ *   from upper limits (rebate cap / spend cap); uses currency badges for glanceability.
  */
 export function PromoEditorModal({ draft, currency, cardName, onClose, onSave }: PromoEditorModalProps) {
   const colors = useThemeColors();
   const { t } = useI18n();
   const [title, setTitle] = useState('');
+  const [category, setCategory] = useState<string>('all');
   const [rateDraft, setRateDraft] = useState('3');
   const [startDate, setStartDate] = useState(dayKeyFromDate(new Date()));
   const [endDate, setEndDate] = useState(dayKeyFromDate(new Date()));
   const [requiresRegistration, setRequiresRegistration] = useState(true);
   const [isRegistered, setIsRegistered] = useState(false);
+  const [isStackable, setIsStackable] = useState(draft?.isStackable ?? false);
+  const [minSpendPerTx, setMinSpendPerTx] = useState('');
+  const [minTotalSpend, setMinTotalSpend] = useState('');
   const [maxCap, setMaxCap] = useState('');
+  const [maxSpendCap, setMaxSpendCap] = useState('');
 
   useEffect(() => {
     if (!draft) {
       return;
     }
     setTitle(draft.title);
+    setCategory(draft.category || 'all');
     setRateDraft(formatPercentInput(draft.extraRebateRate));
     setStartDate(draft.startDate);
     setEndDate(draft.endDate);
     setRequiresRegistration(draft.requiresRegistration);
     setIsRegistered(draft.isRegistered);
+    setIsStackable(draft.isStackable ?? false);
+    setMinSpendPerTx(draft.minSpendPerTx !== undefined ? String(draft.minSpendPerTx) : '');
+    setMinTotalSpend(draft.minTotalSpend !== undefined ? String(draft.minTotalSpend) : '');
     setMaxCap(draft.maxRebateCap !== undefined ? String(draft.maxRebateCap) : '');
+    setMaxSpendCap(draft.maxSpendCap !== undefined ? String(draft.maxSpendCap) : '');
   }, [draft?.id]);
 
   if (!draft) {
@@ -79,6 +105,19 @@ export function PromoEditorModal({ draft, currency, cardName, onClose, onSave }:
               placeholderTextColor={colors.faint}
               style={[insetSurface(colors, 16), styles.amount, { color: colors.ink }]}
             />
+
+            <Text style={[styles.label, { color: colors.faint }]}>{t('cardRewards.category')}</Text>
+            <View style={styles.chipWrap}>
+              {PROMO_CATEGORIES.map((catId) => (
+                <Chip
+                  key={catId}
+                  label={categoryLabel(t, catId)}
+                  selected={category === catId}
+                  onPress={() => setCategory(catId)}
+                />
+              ))}
+            </View>
+
             <Text style={[styles.label, { color: colors.faint }]}>{t('cardRewards.extraRebateRate')}</Text>
             <View style={[insetSurface(colors, 16), styles.affixWell]}>
               <TextInput
@@ -92,6 +131,7 @@ export function PromoEditorModal({ draft, currency, cardName, onClose, onSave }:
                 <Text style={[styles.affixBadgeText, { color: colors.accent }]}>%</Text>
               </View>
             </View>
+
             <DateField
               label={t('cardRewards.startDate')}
               value={dateFromDayKey(startDate)}
@@ -102,6 +142,7 @@ export function PromoEditorModal({ draft, currency, cardName, onClose, onSave }:
               value={dateFromDayKey(endDate)}
               onChange={(next) => setEndDate(dayKeyFromDate(next))}
             />
+
             <View style={styles.enabled}>
               <Text style={[styles.meta, { color: colors.muted }]}>{t('cardRewards.requiresRegistration')}</Text>
               <Switch
@@ -120,13 +161,50 @@ export function PromoEditorModal({ draft, currency, cardName, onClose, onSave }:
                 thumbColor={colors.scheme === 'dark' ? '#E4DDD4' : '#FFF8F2'}
               />
             </View>
+            <View style={styles.enabled}>
+              <Text style={[styles.meta, { color: colors.muted }]}>{t('cardRewards.isStackable')}</Text>
+              <Switch
+                value={isStackable}
+                onValueChange={setIsStackable}
+                trackColor={{ false: colors.line, true: colors.accent }}
+                thumbColor={colors.scheme === 'dark' ? '#E4DDD4' : '#FFF8F2'}
+              />
+            </View>
+
+            {/* Lower Limits Section */}
+            <Text style={[styles.sectionHeading, { color: colors.ink }]}>{t('cardRewards.lowerLimitsSection')}</Text>
             <OptionalCapField
-              label={t('cardRewards.maxPromoRebate')}
+              label={t('cardRewards.promoMinSpendPerTx')}
+              value={minSpendPerTx}
+              onChangeText={setMinSpendPerTx}
+              currency={currency}
+              placeholder={t('cardRewards.minSpendPlaceholder')}
+            />
+            <OptionalCapField
+              label={t('cardRewards.promoMinTotalSpend')}
+              value={minTotalSpend}
+              onChangeText={setMinTotalSpend}
+              currency={currency}
+              placeholder={t('cardRewards.minSpendPlaceholder')}
+            />
+
+            {/* Upper Limits Section */}
+            <Text style={[styles.sectionHeading, { color: colors.ink }]}>{t('cardRewards.upperLimitsSection')}</Text>
+            <OptionalCapField
+              label={t('cardRewards.promoMaxRebateCap')}
               value={maxCap}
               onChangeText={setMaxCap}
               currency={currency}
               placeholder={t('cardRewards.capPlaceholder')}
             />
+            <OptionalCapField
+              label={t('cardRewards.promoMaxSpendCap')}
+              value={maxSpendCap}
+              onChangeText={setMaxSpendCap}
+              currency={currency}
+              placeholder={t('cardRewards.capPlaceholder')}
+            />
+
             <PrimaryButton
               icon="checkmark-circle-outline"
               label={t('cardRewards.savePromotion')}
@@ -135,11 +213,16 @@ export function PromoEditorModal({ draft, currency, cardName, onClose, onSave }:
                 onSave({
                   ...draft,
                   title: title.trim() || t('cardRewards.editPromotion'),
+                  category: category === 'all' ? undefined : category,
                   extraRebateRate: Number.isFinite(rate) && rate >= 0 ? rate / 100 : draft.extraRebateRate,
                   startDate,
                   endDate,
                   requiresRegistration,
                   isRegistered,
+                  isStackable,
+                  minSpendPerTx: parseOptionalNumber(minSpendPerTx),
+                  minTotalSpend: parseOptionalNumber(minTotalSpend),
+                  maxSpendCap: parseOptionalNumber(maxSpendCap),
                   maxRebateCap: parseOptionalNumber(maxCap),
                 });
               }}
@@ -152,7 +235,7 @@ export function PromoEditorModal({ draft, currency, cardName, onClose, onSave }:
 }
 
 /**
- * Purpose: optional promo rebate-cap well with girlfriend-facing currency badge.
+ * Purpose: optional promo limit field with currency badge.
  * Inputs: label, string value, change handler, currency, placeholder.
  * Outputs: labeled inset row `[ HK$ ] [ value ]`.
  * Side effects: onChangeText only.
@@ -204,11 +287,11 @@ function parseOptionalNumber(raw: string): number | undefined {
     return undefined;
   }
   const parsed = Number(trimmed);
-  return Number.isFinite(parsed) ? parsed : undefined;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
 }
 
 /**
- * Purpose: girlfriend-facing currency symbol for input badges (matches formatFriendlyMoney).
+ * Purpose: currency symbol for input badges (matches formatFriendlyMoney).
  * Inputs: MoneyCurrency code.
  * Outputs: HK$ / US$ / CN¥.
  * Side effects: none.
@@ -245,6 +328,18 @@ const styles = StyleSheet.create({
   modalBody: { paddingHorizontal: 20, paddingBottom: 40, gap: 12 },
   fieldGroup: { gap: 6 },
   label: { fontFamily: fonts.bodySemi, fontSize: 12, letterSpacing: 0.8, textTransform: 'uppercase' },
+  sectionHeading: {
+    fontFamily: fonts.bodySemi,
+    fontSize: 14,
+    letterSpacing: 0.3,
+    marginTop: 12,
+    marginBottom: 2,
+  },
+  chipWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
   amount: {
     fontFamily: fonts.body,
     fontSize: 18,

@@ -195,22 +195,18 @@ export function PaymentCardsScreen() {
           <PromotionsSection
             rows={activePromos}
             cardCount={creditCards.length}
+            currency={currency}
             colors={colors}
             t={t}
             onToggle={(cardId, promoId) => {
               void toggleCardPromotionRegistration(cardId, promoId);
             }}
             onEditPromo={openEditPromotion}
-            onAddPromotion={startAddPromotion}
-            onAddCard={() => router.push(appHref('/reminders/card/new'))}
           />
         ) : creditCards.length === 0 ? (
           <EmptyState
             message={t('money.paymentCardsEmpty')}
             backdropIcon="card-outline"
-            actionLabel={t('money.addCard')}
-            actionIcon="card-outline"
-            onAction={() => router.push(appHref('/reminders/card/new'))}
           />
         ) : viewMode === 'bank' ? (
           <BankGroupedList
@@ -377,6 +373,12 @@ function PaymentCardRow({
   const earned = summary?.totalRebate ?? 0;
   const capProgress = resolveCapProgress(summary, card);
   const earnedLabel = formatFriendlyMoney(earned, currency);
+  const cycleBadgeLabel =
+    card.billingCycleType === 'statement'
+      ? t('cardRewards.cycleBadge', {
+          range: `${formatDueDay((card.statementDayOfMonth % 31) + 1, t)}–${formatDueDay(card.statementDayOfMonth, t)}`,
+        })
+      : t('cardRewards.cycleTypeCalendar');
 
   return (
     <Pressable onPress={onPress} accessibilityRole="button">
@@ -433,6 +435,11 @@ function PaymentCardRow({
           <View style={[styles.rateChip, { backgroundColor: colors.well }]}>
             <Text style={[styles.rateChipText, { color: colors.ink, fontSize: scaleFontSize(12) }]}>
               {baseRateLabel}
+            </Text>
+          </View>
+          <View style={[styles.rateChip, { backgroundColor: colors.well }]}>
+            <Text style={[styles.rateChipText, { color: colors.muted, fontSize: scaleFontSize(12) }]}>
+              {cycleBadgeLabel}
             </Text>
           </View>
           {topRules.map((rule) => (
@@ -555,21 +562,19 @@ function tierAbbreviation(cardTier?: string): string {
 function PromotionsSection({
   rows,
   cardCount,
+  currency,
   colors,
   t,
   onToggle,
   onEditPromo,
-  onAddPromotion,
-  onAddCard,
 }: {
   rows: ActivePromoRow[];
   cardCount: number;
+  currency: MoneyCurrency;
   colors: ThemeColors;
   t: Translate;
   onToggle: (cardId: string, promoId: string) => void;
   onEditPromo: (card: CreditCardAccount, promo: CardBankPromotion) => void;
-  onAddPromotion: () => void;
-  onAddCard: () => void;
 }) {
   const { type, scaleFontSize } = useTypography();
 
@@ -587,11 +592,6 @@ function PromotionsSection({
         <Text style={[type.subhead, { color: colors.muted, textAlign: 'center' }]}>
           {noCards ? t('cardRewards.noCardsForPromo') : t('cardRewards.noPromotionsHint')}
         </Text>
-        <PrimaryButton
-          icon={noCards ? 'card-outline' : 'sparkles-outline'}
-          label={noCards ? t('money.addCard') : t('cardRewards.addPromotion')}
-          onPress={noCards ? onAddCard : onAddPromotion}
-        />
       </GlassSurface>
     );
   }
@@ -641,6 +641,62 @@ function PromotionsSection({
                     })}
                   </Text>
                 </View>
+                {promo.minSpendPerTx ? (
+                  <View style={[styles.rateChip, { backgroundColor: colors.well }]}>
+                    <Text
+                      style={[styles.rateChipText, { color: colors.muted, fontSize: scaleFontSize(12) }]}
+                    >
+                      {t('cardRewards.promoMinSpendBadge', {
+                        amount: formatFriendlyMoney(promo.minSpendPerTx, currency),
+                      })}
+                    </Text>
+                  </View>
+                ) : null}
+                {promo.minTotalSpend ? (
+                  <View style={[styles.rateChip, { backgroundColor: colors.well }]}>
+                    <Text
+                      style={[styles.rateChipText, { color: colors.muted, fontSize: scaleFontSize(12) }]}
+                    >
+                      {t('cardRewards.promoMinTotalBadge', {
+                        amount: formatFriendlyMoney(promo.minTotalSpend, currency),
+                      })}
+                    </Text>
+                  </View>
+                ) : null}
+                {promo.maxRebateCap ? (
+                  <View style={[styles.rateChip, { backgroundColor: colors.well }]}>
+                    <Text
+                      style={[styles.rateChipText, { color: colors.muted, fontSize: scaleFontSize(12) }]}
+                    >
+                      {t('cardRewards.promoCapBadge', {
+                        amount: formatFriendlyMoney(promo.maxRebateCap, currency),
+                      })}
+                    </Text>
+                  </View>
+                ) : null}
+                {promo.maxSpendCap ? (
+                  <View style={[styles.rateChip, { backgroundColor: colors.well }]}>
+                    <Text
+                      style={[styles.rateChipText, { color: colors.muted, fontSize: scaleFontSize(12) }]}
+                    >
+                      {t('cardRewards.promoSpendCapBadge', {
+                        amount: formatFriendlyMoney(promo.maxSpendCap, currency),
+                      })}
+                    </Text>
+                  </View>
+                ) : null}
+                {promo.isStackable ? (
+                  <View style={[styles.rateChip, { backgroundColor: colors.accentSoft }]}>
+                    <Text
+                      style={[
+                        styles.rateChipText,
+                        { color: colors.accent, fontSize: scaleFontSize(12) },
+                      ]}
+                    >
+                      {t('cardRewards.stackableBadge')}
+                    </Text>
+                  </View>
+                ) : null}
                 <View style={[styles.rateChip, { backgroundColor: colors.well }]}>
                   <Text
                     style={[styles.rateChipText, { color: colors.muted, fontSize: scaleFontSize(12) }]}
@@ -1020,12 +1076,14 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   emptyPromo: {
-    padding: 18,
-    gap: 14,
-    alignItems: 'stretch',
+    paddingVertical: 26,
+    paddingHorizontal: 20,
+    gap: 12,
+    alignItems: 'center',
   },
   emptyPromoIconWrap: {
     alignItems: 'center',
+    marginBottom: 2,
     opacity: 0.85,
   },
   promoCard: {

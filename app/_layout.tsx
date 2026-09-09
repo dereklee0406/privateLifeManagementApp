@@ -128,6 +128,8 @@ function RootNavigation() {
         <Stack.Screen name="trash" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="expense-categories" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="payment-cards" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="subscriptions" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="habits" options={{ animation: 'slide_from_right' }} />
       </Stack>
     </>
   );

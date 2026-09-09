@@ -13,8 +13,10 @@ const KINDS: ReminderKind[] = ['follow-up', 'goal', 'reflection', 'anniversary']
 const PRIORITIES: ReminderPriority[] = ['low', 'normal', 'high', 'urgent'];
 const PING_ROLES: CreditCardPingRole[] = ['statement', 'due', 'custom'];
 const REWARD_TYPES: CardRewardType[] = ['cashback', 'miles', 'points'];
+const BILLING_CYCLE_TYPES = ['calendar', 'statement'] as const;
 const DEFAULT_BASE_REBATE_RATE = 0.004;
 const DAY_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
+type BillingCycleType = (typeof BILLING_CYCLE_TYPES)[number];
 
 export interface ReminderDocument {
   reminders: Reminder[];
@@ -151,11 +153,15 @@ export function normalizeCreditCards(raw: unknown): CreditCardAccount[] {
       const baseRaw = Number(value.baseRebateRate);
       const baseRebateRate =
         Number.isFinite(baseRaw) && baseRaw >= 0 ? baseRaw : DEFAULT_BASE_REBATE_RATE;
+      const billingCycleType = BILLING_CYCLE_TYPES.includes(value.billingCycleType as BillingCycleType)
+        ? (value.billingCycleType as BillingCycleType)
+        : undefined;
       const account: CreditCardAccount = {
         id: value.id,
         name: value.name,
         dueDayOfMonth: Math.min(31, Math.max(1, Math.floor(due))),
         statementDayOfMonth: Math.min(31, Math.max(1, Math.floor(statement))),
+        billingCycleType,
         amountDue: Number.isFinite(amount) ? amount : undefined,
         currentBalance: Number.isFinite(balance) ? Math.max(0, balance) : undefined,
         bankId,
@@ -163,6 +169,8 @@ export function normalizeCreditCards(raw: unknown): CreditCardAccount[] {
         cardTier,
         rewardType,
         baseRebateRate,
+        fxFeeRate: parseNonNegativeFinite(value.fxFeeRate),
+        milesConversionRate: parsePositiveFinite(value.milesConversionRate),
         rebateRules: normalizeRebateRules(value.rebateRules),
         monthlySpendCap: parsePositiveFinite(value.monthlySpendCap),
         monthlyRebateCap: parsePositiveFinite(value.monthlyRebateCap),
@@ -186,6 +194,20 @@ export function normalizeCreditCards(raw: unknown): CreditCardAccount[] {
 function parsePositiveFinite(raw: unknown): number | undefined {
   const value = Number(raw);
   if (!Number.isFinite(value) || value <= 0) {
+    return undefined;
+  }
+  return value;
+}
+
+/**
+ * Purpose: coerce optional non-negative finite numbers (e.g. FX fee 0 or 0.0195).
+ * Inputs: unknown JSON value.
+ * Outputs: finite number >= 0, or undefined.
+ * Side effects: none.
+ */
+function parseNonNegativeFinite(raw: unknown): number | undefined {
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value < 0) {
     return undefined;
   }
   return value;
@@ -283,7 +305,9 @@ function normalizePromotions(raw: unknown): CardBankPromotion[] {
         endDate: value.endDate,
         minSpendPerTx: parsePositiveFinite(value.minSpendPerTx),
         minTotalSpend: parsePositiveFinite(value.minTotalSpend),
+        maxSpendCap: parsePositiveFinite(value.maxSpendCap),
         maxRebateCap: parsePositiveFinite(value.maxRebateCap),
+        isStackable: value.isStackable === true ? true : undefined,
         requiresRegistration: value.requiresRegistration === true,
         isRegistered: value.isRegistered === true,
         termsNote:

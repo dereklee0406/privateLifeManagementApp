@@ -267,6 +267,12 @@ export function MoneyScreen() {
             selected={false}
             onPress={() => router.push('/transfer/new')}
           />
+          <Chip
+            leadingIcon="repeat-outline"
+            label={t('subscriptions.cockpitTitle')}
+            selected={false}
+            onPress={() => router.push('/subscriptions')}
+          />
           {dueRepeats.map((rule) => (
             <Chip
               key={rule.id}
