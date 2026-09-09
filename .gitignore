@@ -1,0 +1,67 @@
+# Dependencies
+node_modules/
+package-lock.json.bak
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Expo & Builds
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Generated native directories
+/ios
+/android
+
+# Native artifacts & build files
+*.orig.*
+.kotlin/
+*.apk
+*.aab
+*.ipa
+*.dex
+*.class
+
+# Signing keys & secrets
+*.jks
+*.keystore
+credentials.json
+*.p8
+*.p12
+*.key
+*.pem
+*.mobileprovision
+
+# Metro bundler
+.metro-health-check*
+
+# Environment variables & local secrets
+.env
+.env.local
+.env.*.local
+.env.production
+.env.staging
+
+# TypeScript & Cache
+*.tsbuildinfo
+.cache/
+coverage/
+
+# OS metadata & temporary files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+[Dd]esktop.ini
+
+# IDE & Editors (keep shared team settings like tasks.json)
+.idea/
+*.swp
+*.swo
+*~
