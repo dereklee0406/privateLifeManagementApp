@@ -36,7 +36,7 @@ import { tabScenePaddingBottom, type } from '../theme/typography';
 export type InsightsSegment = 'week' | 'month';
 
 /**
- * Purpose: parse Insights deep-link `segment` (Today Season mark → This month).
+ * Purpose: parse Insights deep-link `segment` (Today Season hero → This month).
  * Inputs: raw query.
  * Outputs: week | month | null.
  * Side effects: none.

@@ -2,6 +2,13 @@
 
 ## 2026-09-10
 - Date: 2026-09-10
+- Description: **One-glance Today** — Home is now one Season score, one Next Up action, and one Focus goal above the fold. Compact date + greeting (writing streak dropped; it lives in Season/Insights). Compact Season hero (rank + meter + present-only pillar ticks) replaces the muted Season line; tap opens Insights This month. Recurring strip, prediction, mood bar, this-week chips, photo highlight, on-this-day, and reflection cue leave Today (prediction stays on Insights week; photos stay in Journal / Settings Photos). FAB Write / Spend / Habit unchanged. Five tabs kept. No cloud AI, no Focus Session, no 5-button action row.
+- Affected modules: View (`HomeScreen.tsx`, `TodaySeasonHero.tsx`, `TodayFocusRow.tsx`); i18n (`season.heroA11y` in en / zh-Hant / zh-Hans / ja); CHANGELOG
+- Reason: UX — 5-second glance: one composite status + the next tap, not a widget wall
+- Impact: High
+
+## 2026-09-10
+- Date: 2026-09-10
 - Description: **Insights board pack** — Tab 5 Insights is no longer a sparse three-line scoreboard. This week | This month keeps the same math and pressure, but the screen now reads as a private board pack: Season hero (rank + 0–100 meter + writing/habits/envelopes bars; missing pillars omitted), 2-column glance tiles with vs-last deltas (aligned week/month-to-date), a 7-cell writing strip or month pace bar, and one editorial takeaway. Sparse first week/month still draws the board and invites Write / Habit / Spend (Worth on month) via existing hubs. No cloud AI, no sixth tab, no Rhythm/Wallet list reprint.
 - Affected modules: Model (`insights/boardFacts.ts`, `life/weekBounds.ts`, `season/seasonRank.ts`, tests); View (`InsightsScreen.tsx`, `InsightsSeasonHero.tsx`, `InsightsGlanceGrid.tsx`, `InsightsWeekStrip.tsx`, `InsightsTakeaway.tsx`, `insightsCopy.ts`); i18n (en / zh-Hant / zh-Hans / ja); CHANGELOG
 - Reason: UX — Sunday / 1st Insights should feel like Apple Health + YNAB glance in Halo clay, not three muted lines

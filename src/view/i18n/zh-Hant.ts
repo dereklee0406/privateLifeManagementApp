@@ -319,6 +319,7 @@ export const zhHant: TranslationCatalog = {
     steel: '精鋼',
     mark: '賽季 · %{rank}',
     markA11y: '賽季 %{rank}。打開洞察。',
+    heroA11y: '賽季 %{rank}，%{score} 分。打開洞察。',
     writingDays: '%{count} 個寫作日',
     writingDayOne: '1 個寫作日',
   },

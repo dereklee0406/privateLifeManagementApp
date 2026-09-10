@@ -12,11 +12,11 @@ import { fonts, groupedRadius } from '../theme/tokens';
 import { GlassSurface } from './GlassSurface';
 
 /**
- * Purpose: compact Today row for the single active Goal — not a second 30s hero.
+ * Purpose: compact Today row for the single active Goal — the one-glance goal.
  * Inputs: GoalProvider list; pickFocusGoal + goalProgress in Model.
- * Outputs: one thin Focus row under Next Up / due strip, or nothing when no active Goal.
+ * Outputs: one thin Focus row under Next Up, or nothing when no active Goal.
  * Side effects: navigates to Rhythm Focus.
- * Design decisions: hidden when empty so Today stays a 30s loop; tap opens Focus, not a fat card.
+ * Design decisions: hidden when empty so Today stays score + Next Up; tap opens Focus, not a fat card.
  */
 export function TodayFocusRow() {
   const colors = useThemeColors();

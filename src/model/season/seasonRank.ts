@@ -36,7 +36,7 @@ export const SEASON_WINDOW_DAYS = 30;
 /**
  * Purpose: derived Season snapshot — never persisted.
  * Inputs: computeSeasonRank.
- * Outputs: rank, 0–1 score, pillar rates, writing days, best habit streak (Today mark).
+ * Outputs: rank, 0–1 score, pillar rates, writing days, best habit streak (Today hero).
  * Side effects: none.
  */
 export interface SeasonRank {

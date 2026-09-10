@@ -317,6 +317,7 @@ export const en = {
     steel: 'Steel',
     mark: 'Season · %{rank}',
     markA11y: 'Season %{rank}. Open Insights.',
+    heroA11y: 'Season %{rank}, %{score} of 100. Open Insights.',
     writingDays: '%{count} writing days',
     writingDayOne: '1 writing day',
   },

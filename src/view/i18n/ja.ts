@@ -319,6 +319,7 @@ export const ja: TranslationCatalog = {
     steel: '鋼鉄',
     mark: 'シーズン · %{rank}',
     markA11y: 'シーズン %{rank}。インサイトを開く。',
+    heroA11y: 'シーズン %{rank}、%{score}。インサイトを開く。',
     writingDays: '%{count} 日書いた',
     writingDayOne: '1 日書いた',
   },

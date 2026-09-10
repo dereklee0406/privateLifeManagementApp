@@ -320,6 +320,7 @@ export const zhHans: TranslationCatalog = {
     steel: '精钢',
     mark: '赛季 · %{rank}',
     markA11y: '赛季 %{rank}。打开洞察。',
+    heroA11y: '赛季 %{rank}，%{score} 分。打开洞察。',
     writingDays: '%{count} 个写作日',
     writingDayOne: '1 个写作日',
   },
