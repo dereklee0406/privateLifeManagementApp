@@ -296,6 +296,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     minHeight: 52,
+    fontVariant: ['tabular-nums'],
   },
   resultWell: {
     padding: 16,
@@ -312,6 +313,7 @@ const styles = StyleSheet.create({
     fontFamily: fonts.display,
     flexShrink: 1,
     minWidth: 0,
+    fontVariant: ['tabular-nums'],
   },
   rateBadge: {
     borderRadius: 999,
@@ -320,6 +322,7 @@ const styles = StyleSheet.create({
   },
   rateBadgeText: {
     fontFamily: fonts.bodySemi,
+    fontVariant: ['tabular-nums'],
   },
   capBadge: {
     alignSelf: 'flex-start',
@@ -330,5 +333,6 @@ const styles = StyleSheet.create({
   },
   capBadgeText: {
     fontFamily: fonts.bodyMedium,
+    fontVariant: ['tabular-nums'],
   },
 });

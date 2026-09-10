@@ -18,6 +18,7 @@ import {
 } from '../../model/settings/AppSettings';
 import { resolveLanguagePreference, type LanguagePreference } from '../../model/settings/language';
 import { appHref } from '../../utils/navigation';
+import { BackButton } from '../components/BackButton';
 import { BackupPanel } from '../components/BackupPanel';
 import { Chip } from '../components/Chip';
 import { CustomizePanel } from '../components/CustomizePanel';
@@ -110,6 +111,7 @@ export function SettingsScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.topRow}>
+          {router.canGoBack() ? <BackButton /> : null}
           <View style={styles.titleBlock}>
             <Text style={[type.footnote, styles.headerKicker, { color: colors.accent }]}>
               {t('you.headerKicker')}

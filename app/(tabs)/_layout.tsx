@@ -5,7 +5,7 @@ import { useI18n } from '@/view/i18n';
 /**
  * Purpose: five-tab shell with a floating glass island instead of a system tab bar.
  * Inputs: Expo Router tab routes.
- * Outputs: tab navigator (Today, Pages, Rhythm, Money, Settings). How you’ve been stays reachable from Settings.
+ * Outputs: tab navigator (Today, Pages, Rhythm, Money, Insights). Settings is href:null; open via `/settings`.
  * Side effects: none.
  */
 export default function TabsLayout() {
@@ -24,8 +24,8 @@ export default function TabsLayout() {
       <Tabs.Screen name="journal" options={{ title: t('tabs.pages') }} />
       <Tabs.Screen name="calendar" options={{ title: t('tabs.rhythm') }} />
       <Tabs.Screen name="money" options={{ title: t('tabs.money') }} />
-      <Tabs.Screen name="settings" options={{ title: t('tabs.settings') }} />
-      <Tabs.Screen name="insights" options={{ title: t('you.howYouveBeen'), href: null }} />
+      <Tabs.Screen name="insights" options={{ title: t('tabs.insights') }} />
+      <Tabs.Screen name="settings" options={{ title: t('tabs.settings'), href: null }} />
     </Tabs>
   );
 }

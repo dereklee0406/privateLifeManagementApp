@@ -16,9 +16,10 @@ import { onThisDayMemories } from '../../model/journal/onThisDay';
 import { nextUpCard } from '../../model/today/nextUp';
 import { formatHeaderDate, formatMemoryDate } from '../../utils/dateUtils';
 import { appHref } from '../../utils/navigation';
-import { hapticSuccess } from '../../utils/haptics';
+import { hapticLight, hapticSuccess } from '../../utils/haptics';
 import { GlassSurface } from '../components/GlassSurface';
 import { EmptyState } from '../components/EmptyState';
+import { GlobalFastCaptureSheet } from '../components/GlobalFastCaptureSheet';
 import { InlineHomeQuickAdd } from '../components/InlineHomeQuickAdd';
 import { JournalMediaImage } from '../components/JournalMediaImage';
 import { LargeTitle } from '../components/LargeTitle';
@@ -38,7 +39,8 @@ import { useI18n, localizeNextUpBadge, localizeWeeklyChips, localizeWeeklySummar
  * Inputs: journal, reminders, finance, settings.
  * Outputs: a short first screen. No charts. No net worth.
  * Side effects: navigates to compose, voice, spend, search, reminder, card, memories, or a past page;
- *   1-tap completeReminder on Next Up when itemType is reminder.
+ *   1-tap completeReminder on Next Up when itemType is reminder;
+ *   FAB opens GlobalFastCaptureSheet; spend tile hands off to QuickSpendSheet.
  */
 export function HomeScreen() {
   const colors = useThemeColors();
@@ -50,6 +52,7 @@ export function HomeScreen() {
   const { expenses, budgets } = useFinance();
   const { t, intlLocale } = useI18n();
   const [completingNext, setCompletingNext] = useState(false);
+  const [captureOpen, setCaptureOpen] = useState(false);
   const [quickSpendOpen, setQuickSpendOpen] = useState(false);
   const now = useMemo(() => new Date(), [entries.length, reminders.length, expenses.length]);
   const headerDate = useMemo(() => formatHeaderDate(now, intlLocale), [now, intlLocale]);
@@ -329,17 +332,32 @@ export function HomeScreen() {
       </ScrollView>
 
       <Pressable
-        onPress={() => setQuickSpendOpen(true)}
+        onPress={() => {
+          void hapticLight();
+          setCaptureOpen(true);
+        }}
         accessibilityRole="button"
-        accessibilityLabel={t('spend.quickSpend')}
-        style={[
+        accessibilityLabel={t('capture.title')}
+        style={({ pressed }) => [
           raisedAccent(colors, 28),
           styles.fab,
-          { bottom: tabScenePaddingBottom(insets.bottom) + 12, right: 22 },
+          {
+            bottom: tabScenePaddingBottom(insets.bottom) + 12,
+            right: 22,
+            transform: [{ scale: pressed ? 0.94 : 1 }],
+          },
         ]}
       >
-        <Ionicons name="flash" size={24} color={colors.accentInk} accessible={false} importantForAccessibility="no" />
+        <Ionicons name="add" size={28} color={colors.accentInk} accessible={false} importantForAccessibility="no" />
       </Pressable>
+      <GlobalFastCaptureSheet
+        visible={captureOpen}
+        onClose={() => setCaptureOpen(false)}
+        onSelectSpend={() => {
+          setCaptureOpen(false);
+          setTimeout(() => setQuickSpendOpen(true), 280);
+        }}
+      />
       <QuickSpendSheet visible={quickSpendOpen} onClose={() => setQuickSpendOpen(false)} />
     </ScreenScaffold>
   );

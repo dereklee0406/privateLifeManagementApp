@@ -382,6 +382,7 @@ const styles = StyleSheet.create({
   },
   previewValue: {
     fontFamily: fonts.bodySemi,
+    fontVariant: ['tabular-nums'],
   },
   feeRow: {
     width: '100%',
@@ -391,5 +392,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
     width: '100%',
+    fontVariant: ['tabular-nums'],
   },
 });

@@ -185,7 +185,7 @@ export function SubscriptionsCockpitScreen({ embedded = false }: SubscriptionsCo
           <Text style={[type.footnote, { color: colors.muted }]}>
             {t('subscriptions.annualBurn')}
           </Text>
-          <Text style={[type.headline, { color: colors.ink }]}>
+          <Text style={[type.headline, styles.annualValue, { color: colors.ink }]}>
             {formatMoney(summary.totalAnnualBurn, currency)}
             <Text style={[type.footnote, { color: colors.muted }]}>
               {' '}
@@ -194,7 +194,7 @@ export function SubscriptionsCockpitScreen({ embedded = false }: SubscriptionsCo
           </Text>
         </View>
         <View style={[insetSurface(colors, 14), styles.activeBadge]}>
-          <Text style={[type.caption, { color: colors.accent }]}>
+          <Text style={[type.caption, styles.countBadge, { color: colors.accent }]}>
             {t('subscriptions.activeSubscriptions', { count: summary.activeCount })}
           </Text>
         </View>
@@ -226,7 +226,7 @@ export function SubscriptionsCockpitScreen({ embedded = false }: SubscriptionsCo
                     {title}
                   </Text>
                   <View style={[insetSurface(colors, 12), styles.renewalPill]}>
-                    <Text style={[type.caption, { color: colors.accent }]} numberOfLines={1}>
+                    <Text style={[type.caption, styles.countdown, { color: colors.accent }]} numberOfLines={1}>
                       {renewalBadgeLabel(row.daysUntilRenewal, t)}
                     </Text>
                   </View>
@@ -271,11 +271,11 @@ export function SubscriptionsCockpitScreen({ embedded = false }: SubscriptionsCo
                 <Text style={[type.headline, { color: colors.ink }]} numberOfLines={1}>
                   {row.cardName}
                 </Text>
-                <Text style={[type.subhead, { color: colors.muted }]} numberOfLines={1}>
+                <Text style={[type.subhead, styles.cardChipAmount, { color: colors.muted }]} numberOfLines={1}>
                   {formatMoney(row.monthlyTotal, currency)}
                   {t('subscriptions.perMonth')}
                 </Text>
-                <Text style={[type.caption, { color: colors.faint }]}>
+                <Text style={[type.caption, styles.countBadge, { color: colors.faint }]}>
                   {t('subscriptions.activeSubscriptions', { count: row.count })}
                 </Text>
               </View>
@@ -315,11 +315,11 @@ export function SubscriptionsCockpitScreen({ embedded = false }: SubscriptionsCo
                         {title}
                       </Text>
                       <View style={[insetSurface(colors, 10), styles.amountPill]}>
-                        <Text style={[type.caption, { color: colors.muted }]} numberOfLines={1}>
+                        <Text style={[type.caption, styles.amountBadge, { color: colors.muted }]} numberOfLines={1}>
                           {amountBadge}
                         </Text>
                       </View>
-                      <Text style={[type.footnote, { color: colors.faint }]} numberOfLines={1}>
+                      <Text style={[type.footnote, styles.renewalMeta, { color: colors.faint }]} numberOfLines={1}>
                         {renewalBadgeLabel(row.daysUntilRenewal, t)} · {renewalLabel}
                       </Text>
                       {row.cardName ? <SpendCardBadge name={row.cardName} /> : null}
@@ -425,11 +425,17 @@ const styles = StyleSheet.create({
     marginTop: 8,
     gap: 4,
   },
+  annualValue: {
+    fontVariant: ['tabular-nums'],
+  },
   activeBadge: {
     alignSelf: 'flex-start',
     marginTop: 10,
     paddingHorizontal: 12,
     paddingVertical: 6,
+  },
+  countBadge: {
+    fontVariant: ['tabular-nums'],
   },
   block: {
     gap: 10,
@@ -458,6 +464,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
+  countdown: {
+    fontVariant: ['tabular-nums'],
+  },
   logBtn: {
     marginTop: 4,
     minHeight: 40,
@@ -483,6 +492,9 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     gap: 4,
   },
+  cardChipAmount: {
+    fontVariant: ['tabular-nums'],
+  },
   list: {
     gap: 10,
   },
@@ -504,6 +516,12 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     paddingHorizontal: 10,
     paddingVertical: 4,
+  },
+  amountBadge: {
+    fontVariant: ['tabular-nums'],
+  },
+  renewalMeta: {
+    fontVariant: ['tabular-nums'],
   },
   stickyFooter: {
     paddingHorizontal: 20,

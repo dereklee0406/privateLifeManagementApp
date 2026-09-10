@@ -2,6 +2,34 @@
 
 ## 2026-09-09
 - Date: 2026-09-09
+- Description: **Global Fast Capture Sheet** — Unified Today FAB into a contextual creation hub (`GlobalFastCaptureSheet`) with four neumorphic tiles: Journal Story (`/compose?mode=text`), Log Spend (handoff to `QuickSpendSheet`), New Habit / Task (`/reminders/new`), and Transfer Funds (`/transfer/new`). Sheet uses `SheetChrome`, tactile scale-0.97 press + light haptic, and full `capture.*` i18n parity across en / zh-Hant / zh-Hans / ja.
+- Affected modules: View (`GlobalFastCaptureSheet.tsx`, `HomeScreen.tsx`); i18n (`en.ts`, `zh-Hant.ts`, `zh-Hans.ts`, `ja.ts`); CHANGELOG
+- Reason: UX — eliminate creation siloing with one Fast Capture ritual from Today
+- Impact: High
+
+## 2026-09-09
+- Date: 2026-09-09
+- Description: **Tabular numerals on finance list surfaces** — Enforced `fontVariant: ['tabular-nums']` on transaction/budget/transfer metas, subscription renewal countdowns & amount pills, payment-card rebate/cap/grace badges, Today recurring strip amounts, billing-cycle steppers & grace badges, spend-simulator rebate yields, and transfer balance/fee fields so digits stay width-stable during live updates.
+- Affected modules: View (`MoneyScreen.tsx`, `SubscriptionsCockpitScreen.tsx`, `PaymentCardsScreen.tsx`, `TodayRecurringStrip.tsx`, `CardBillingCycleCard.tsx`, `DayOfMonthStepper.tsx`, `CardSpendSimulator.tsx`, `TransferScreen.tsx`, `Chip.tsx`); CHANGELOG
+- Reason: UX — eliminate horizontal digit jitter on financial lists, countdowns, and real-time rebate math
+- Impact: Medium
+
+## 2026-09-09
+- Date: 2026-09-09
+- Description: **Elevate Insights to Tab 5** — Promoted Insights into the floating tab bar (pie-chart icon / `tabs.insights`) and moved Settings off the primary tabs (`href: null`). Insights gains an editorial lockup (`PERSONAL PULSE` + title) with a tactile circular Settings cog that pushes root `/settings`, plus a 3-segment hub (`Reflection` / `Habits` / `Money Pulse`) covering writing + mood climate, habit streak records, and net-worth / spend / budget pulse. New i18n keys with 100% parity across en / zh-Hant / zh-Hans / ja.
+- Affected modules: View (`FloatingTabBar.tsx`, `InsightsScreen.tsx`, `SettingsScreen.tsx`); Routes (`app/(tabs)/_layout.tsx`, `app/(tabs)/insights.tsx`, `app/(tabs)/settings.tsx`, `app/settings.tsx`, `app/_layout.tsx`); i18n (`en.ts`, `zh-Hant.ts`, `zh-Hans.ts`, `ja.ts`); CHANGELOG
+- Reason: UX/IA — elevate daily personal analytics into a retention hub; keep Settings as a low-frequency stack destination
+- Impact: High
+
+## 2026-09-09
+- Date: 2026-09-09
+- Description: **Multi-domain Calendar Activity Dots & Day Inspection** — Elevated `JournalCalendarView` companion mode with synthesized activity dots (amber journal / emerald habits / accent spends), accent-ring selected day cells with light haptic, and sectioned day drawer cards: journal stories (mood glyph + photo strip), habits with 1-tap complete toggle, spends with tabular-nums amounts, count summary pills, and empty-day Write / Add task / Log spend actions. New i18n keys with parity across en / zh-Hant / zh-Hans / ja.
+- Affected modules: View (`journal/JournalCalendarView.tsx`); i18n (`en.ts`, `zh-Hant.ts`, `zh-Hans.ts`, `ja.ts`); CHANGELOG
+- Reason: UX — cross-cutting calendar synthesis so month glance shows holistic life activity (Journal + Rhythm + Wallet)
+- Impact: High
+
+## 2026-09-09
+- Date: 2026-09-09
 - Description: **Comprehensive UX/UI Architecture & Navigation Overhaul (Phases 1–4)** — Completed the Halo information-architecture and design-system roadmap from the product UX audit:
   1. **Rhythm Hub (Tab 3)** — Consolidated Reminders + Habit Streaks into `RhythmScreen` with `Tasks & Due` vs `Consistency` segments; legacy `/reminders`, `/habits`, and `calendar/reminders` deep-link into the hub.
   2. **Money Hub (Tab 4)** — Restructured into a 3-segment financial home (`Cashflow` / `Subscriptions` / `Cards & Rewards`) via shared `HubSegmentControl`; Subscriptions Cockpit and Payment Cards embed in-tab so the floating tab bar stays visible.

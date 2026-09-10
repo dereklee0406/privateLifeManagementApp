@@ -226,6 +226,7 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyMedium,
     fontSize: 14,
     lineHeight: 18,
+    fontVariant: ['tabular-nums'],
   },
   check: {
     width: 28,

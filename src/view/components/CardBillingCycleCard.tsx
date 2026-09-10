@@ -278,6 +278,7 @@ const styles = StyleSheet.create({
   badgeText: {
     fontFamily: fonts.bodySemi,
     letterSpacing: 0.2,
+    fontVariant: ['tabular-nums'],
   },
   trackBlock: {
     gap: 6,
@@ -313,6 +314,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     letterSpacing: 0.4,
     flex: 1,
+    fontVariant: ['tabular-nums'],
   },
   steppers: {
     flexDirection: 'row',

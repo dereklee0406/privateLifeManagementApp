@@ -503,7 +503,7 @@ function PaymentCardRow({
                 ]}
               />
             </View>
-            <Text style={[type.caption, { color: colors.muted }]}>
+            <Text style={[type.caption, styles.capProgressText, { color: colors.muted }]}>
               {t('cardRewards.capProgress', {
                 used: formatFriendlyMoney(capProgress.used, currency),
                 limit: formatFriendlyMoney(capProgress.limit, currency),
@@ -513,7 +513,7 @@ function PaymentCardRow({
           </View>
         ) : null}
 
-        <Text style={[type.footnote, { color: colors.muted }]}>
+        <Text style={[type.footnote, styles.dueMeta, { color: colors.muted }]}>
           {t('money.paymentCardsDue', { day: formatDueDay(card.dueDayOfMonth, t) })}
         </Text>
       </GlassSurface>
@@ -744,7 +744,7 @@ function PromotionsSection({
                   </Text>
                 </View>
               </View>
-              <Text style={[type.caption, { color: colors.faint }]}>
+              <Text style={[type.caption, styles.promoDateRange, { color: colors.faint }]}>
                 {`${promo.startDate} → ${promo.endDate}`}
               </Text>
               <View
@@ -1096,6 +1096,7 @@ const styles = StyleSheet.create({
   earnedBadgeText: {
     fontFamily: fonts.bodySemi,
     flexShrink: 1,
+    fontVariant: ['tabular-nums'],
   },
   rateChip: {
     paddingHorizontal: 10,
@@ -1104,6 +1105,7 @@ const styles = StyleSheet.create({
   },
   rateChipText: {
     fontFamily: fonts.bodyMedium,
+    fontVariant: ['tabular-nums'],
   },
   capBlock: {
     gap: 6,
@@ -1116,6 +1118,15 @@ const styles = StyleSheet.create({
   capFill: {
     height: '100%',
     borderRadius: 999,
+  },
+  capProgressText: {
+    fontVariant: ['tabular-nums'],
+  },
+  dueMeta: {
+    fontVariant: ['tabular-nums'],
+  },
+  promoDateRange: {
+    fontVariant: ['tabular-nums'],
   },
   emptyPromo: {
     paddingVertical: 26,

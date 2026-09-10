@@ -123,6 +123,7 @@ function RootNavigation() {
         <Stack.Screen name="income/new" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="transfer/new" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="memories" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="settings" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="privacy" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="reminder-types" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="trash" options={{ animation: 'slide_from_right' }} />

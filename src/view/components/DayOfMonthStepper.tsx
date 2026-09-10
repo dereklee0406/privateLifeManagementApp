@@ -171,7 +171,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 2,
   },
-  ordinal: { fontFamily: fonts.bodySemi, fontSize: 12, letterSpacing: 0.4 },
+  ordinal: { fontFamily: fonts.bodySemi, fontSize: 12, letterSpacing: 0.4, fontVariant: ['tabular-nums'] },
   input: {
     fontFamily: fonts.display,
     fontSize: 24,
@@ -179,5 +179,6 @@ const styles = StyleSheet.create({
     minWidth: 48,
     padding: 0,
     margin: 0,
+    fontVariant: ['tabular-nums'],
   },
 });

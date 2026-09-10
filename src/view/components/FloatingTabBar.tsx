@@ -20,7 +20,7 @@ const TAB_ICONS: Array<Omit<TabDescriptor, 'label'> & { labelKey: string }> = [
   { name: 'journal', labelKey: 'tabs.pages', icon: 'book-outline', iconFocused: 'book' },
   { name: 'calendar', labelKey: 'tabs.rhythm', icon: 'checkbox-outline', iconFocused: 'checkbox' },
   { name: 'money', labelKey: 'tabs.money', icon: 'card-outline', iconFocused: 'card' },
-  { name: 'settings', labelKey: 'tabs.settings', icon: 'settings-outline', iconFocused: 'settings' },
+  { name: 'insights', labelKey: 'tabs.insights', icon: 'pie-chart-outline', iconFocused: 'pie-chart' },
 ];
 
 interface TabRoute {
@@ -44,11 +44,12 @@ interface FloatingTabBarProps {
 /**
  * Purpose: iOS-like tab bar shared by Android, iOS, and web.
  * Inputs: Expo Router tab bar props.
- * Outputs: edge-to-edge neumorph bar with five SF-style Ionicons + labels (Today, Pages, Rhythm, Money, Settings).
+ * Outputs: edge-to-edge neumorph bar with five SF-style Ionicons + labels (Today, Pages, Rhythm, Money, Insights).
  * Side effects: light haptic on tab change; navigation events.
  * Design decisions: not a Material FAB and not a floating island — HIG tab bar + Halo dual-shadow.
- *   Only names listed in TABS render. A second tap on the focused tab pops a nested stack.
+ *   Only names listed in TAB_ICONS render. A second tap on the focused tab pops a nested stack.
  *   Tab 3 route folder remains `calendar` for Expo Router stability; label/icon are Rhythm.
+ *   Settings is reached from Insights header (or `/settings`), not as a primary tab.
  */
 export function FloatingTabBar({ state, navigation }: FloatingTabBarProps) {
   const colors = useThemeColors();

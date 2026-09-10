@@ -139,5 +139,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     maxWidth: '100%',
     flexShrink: 1,
+    fontVariant: ['tabular-nums'],
   },
 });
