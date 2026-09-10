@@ -19,11 +19,12 @@ import {
 } from '../model/reminders/creditCards';
 import { makeCategoryPath } from '../model/reminders/categories';
 import {
+  ensureReminderPermission,
   reminderNotificationsSupported,
-  requestReminderPermission,
   syncReminderNotifications,
   type ReminderNotificationFire,
 } from '../data/reminderNotifications';
+import type { NotificationPermissionTrigger } from '../model/reminders/notificationPermission';
 import { createId } from '../utils/idUtils';
 import { toDayKey } from '../utils/dateUtils';
 
@@ -54,6 +55,11 @@ export interface ReminderScheduleOptions {
   redactLockScreen?: boolean;
   privateTitle?: string;
   privateBody?: string;
+  /**
+   * Why this sync ran. `userEnable` is the only trigger that may show the OS permission dialog.
+   * Launch / foreground / sound / restore only reuse an existing grant.
+   */
+  permissionTrigger?: NotificationPermissionTrigger;
 }
 
 /**
@@ -142,7 +148,7 @@ export class ReminderController {
     const nowIso = new Date().toISOString();
     const reminder = draftToReminder(draft, createId(), nowIso, nowIso);
     await this.repository.save({ ...document, reminders: [reminder, ...document.reminders] });
-    await this.syncSchedules();
+    await this.syncSchedules({ permissionTrigger: reminder.enabled ? 'userEnable' : 'soundChange' });
     return reminder;
   }
 
@@ -171,7 +177,7 @@ export class ReminderController {
       ...document,
       reminders: document.reminders.map((item) => (item.id === id ? next : item)),
     });
-    await this.syncSchedules();
+    await this.syncSchedules({ permissionTrigger: next.enabled ? 'userEnable' : 'soundChange' });
     return next;
   }
 
@@ -189,7 +195,7 @@ export class ReminderController {
       ...document,
       reminders: document.reminders.map((item) => (item.id === id ? next : item)),
     });
-    await this.syncSchedules();
+    await this.syncSchedules({ permissionTrigger: enabled ? 'userEnable' : 'soundChange' });
     return next;
   }
 
@@ -304,7 +310,7 @@ export class ReminderController {
       reminders: [...children, ...document.reminders],
       creditCards: [account, ...document.creditCards],
     });
-    await this.syncSchedules();
+    await this.syncSchedules({ permissionTrigger: 'userEnable' });
     return account;
   }
 
@@ -447,7 +453,7 @@ export class ReminderController {
       nowIso,
     );
     await this.repository.save({ ...document, reminders: [reminder, ...document.reminders] });
-    await this.syncSchedules();
+    await this.syncSchedules({ permissionTrigger: 'userEnable' });
     return reminder;
   }
 
@@ -465,16 +471,19 @@ export class ReminderController {
 
   /**
    * Purpose: refill the native DATE window from Model nextFireTimes.
-   * Inputs: playSound from AppSettings; optional redactLockScreen + private tray copy when App Lock is on.
+   * Inputs: playSound from AppSettings; optional redactLockScreen + private tray copy when App Lock is on;
+   *   permissionTrigger (default coldStart — never prompts).
    * Outputs: true when native notifications are supported and permission is granted (or nothing to schedule).
-   * Side effects: POST_NOTIFICATIONS / iOS alert only when at least one reminder is enabled; DATE sync uses current sound.
+   * Side effects: POST_NOTIFICATIONS / iOS alert only when permissionTrigger is userEnable and at least one reminder is enabled.
    * Design decisions: full title/note stay in-app only when lock is on — OS lock screen gets generic copy.
+   *   Launch, foreground, sound flip, and restore reuse an existing grant so cold start stays quiet.
    */
   async syncSchedules(options: ReminderScheduleOptions = {}): Promise<boolean> {
     const playSound = options.playSound ?? this.soundOn;
     const redact = options.redactLockScreen ?? this.redactLockScreen;
     const privateTitle = options.privateTitle?.trim() || this.privateTitle;
     const privateBody = options.privateBody?.trim() || this.privateBody;
+    const permissionTrigger = options.permissionTrigger ?? 'coldStart';
     const { reminders } = await this.repository.load();
     const enabled = reminders.filter((item) => item.enabled);
     if (enabled.length === 0) {
@@ -482,7 +491,7 @@ export class ReminderController {
       return true;
     }
     if (reminderNotificationsSupported()) {
-      const granted = await requestReminderPermission();
+      const granted = await ensureReminderPermission(permissionTrigger);
       if (!granted) {
         await syncReminderNotifications([], playSound);
         return false;

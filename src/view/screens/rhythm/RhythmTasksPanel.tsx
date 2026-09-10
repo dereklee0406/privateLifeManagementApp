@@ -33,7 +33,8 @@ export function RhythmTasksPanel() {
   const { t, intlLocale } = useI18n();
   const colors = useThemeColors();
   const router = useRouter();
-  const { reminders, notificationsLive, setEnabled, completeReminder, uncompleteReminder } = useReminders();
+  const { reminders, notificationsLive, setEnabled, completeReminder, uncompleteReminder, requestOsPings } =
+    useReminders();
   const { settings } = useSettings();
   const reminderTypes = useMemo(() => resolveReminderTypes(settings), [settings]);
   const [top, setTop] = useState<string | 'all'>('all');
@@ -100,9 +101,16 @@ export function RhythmTasksPanel() {
   return (
     <View style={styles.panel}>
       {Platform.OS === 'web' || !notificationsLive ? (
-        <Text style={[type.footnote, { color: colors.faint }]}>
-          {Platform.OS === 'web' ? t('reminder.webNote') : t('reminder.allowNote')}
-        </Text>
+        <Pressable
+          onPress={Platform.OS === 'web' ? undefined : () => void requestOsPings()}
+          disabled={Platform.OS === 'web'}
+          accessibilityRole={Platform.OS === 'web' ? 'text' : 'button'}
+          accessibilityLabel={Platform.OS === 'web' ? t('reminder.webNote') : t('reminder.allowNote')}
+        >
+          <Text style={[type.footnote, { color: colors.faint }]}>
+            {Platform.OS === 'web' ? t('reminder.webNote') : t('reminder.allowNote')}
+          </Text>
+        </Pressable>
       ) : null}
 
       <View style={styles.filters}>

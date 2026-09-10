@@ -159,7 +159,7 @@ export function BackupPanel() {
   return (
     <GroupedSection
       header={t('backup.title')}
-      icon="cloud-outline"
+      icon="phone-portrait-outline"
       footer={t('backup.footer')}
     >
       <View style={styles.inner}>
@@ -182,8 +182,9 @@ export function BackupPanel() {
 
         {mode === 'idle' ? (
           <View style={styles.actions}>
-            <PrimaryButton icon="cloud-upload-outline" label={t('backup.export')} onPress={() => { setError(null); setMode('export'); }} />
-            <PrimaryButton icon="cloud-download-outline" label={t('backup.import')} onPress={() => void startImport()} />
+            <Text style={[styles.hint, { color: colors.muted }]}>{t('backup.newPhone')}</Text>
+            <PrimaryButton icon="share-outline" label={t('backup.export')} onPress={() => { setError(null); setMode('export'); }} />
+            <PrimaryButton icon="download-outline" label={t('backup.import')} onPress={() => void startImport()} />
             <TextButton label={t('backup.exportCsv')} tone="muted" onPress={() => void runCsv()} disabled={busy} />
           </View>
         ) : null}
@@ -217,6 +218,9 @@ export function BackupPanel() {
             style={[insetSurface(colors, 16), styles.input, { color: colors.ink }]}
           />
           <Text style={[styles.hint, { color: colors.faint }]}>
+            {t('backup.writeDown')}
+          </Text>
+          <Text style={[styles.hint, { color: colors.faint }]}>
             {t('backup.keepHint')}
           </Text>
           <PrimaryButton
@@ -231,6 +235,7 @@ export function BackupPanel() {
 
       {mode === 'import' ? (
         <View style={styles.form}>
+          <Text style={[styles.hint, { color: colors.muted }]}>{t('backup.restoreHint')}</Text>
           <Text style={[styles.fieldLabel, { color: colors.ink }]}>{t('backup.passwordFor', { name: importName })}</Text>
           <TextInput
             value={password}

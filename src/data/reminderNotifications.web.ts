@@ -1,3 +1,5 @@
+import type { NotificationPermissionTrigger } from '../model/reminders/notificationPermission';
+
 export interface ReminderNotificationFire {
   reminderId: string;
   index: number;
@@ -26,9 +28,25 @@ export function setReminderNotificationSound(_enabled: boolean): void {
 }
 
 /**
+ * Purpose: web permission stub — no dialog, no grant.
+ */
+export async function hasReminderPermission(): Promise<boolean> {
+  return false;
+}
+
+/**
  * Purpose: web permission stub.
  */
 export async function requestReminderPermission(): Promise<boolean> {
+  return false;
+}
+
+/**
+ * Purpose: web never prompts; schedule stays a local no-op.
+ */
+export async function ensureReminderPermission(
+  _trigger: NotificationPermissionTrigger,
+): Promise<boolean> {
   return false;
 }
 

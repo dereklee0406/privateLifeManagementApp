@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { AppConfig } from '../../config/appConfig';
 import type { LockMode } from '../../model/settings/AppSettings';
 import { isValidPin } from '../../model/settings/pinRules';
 import { ScreenScaffold } from '../components/ScreenScaffold';
@@ -37,12 +38,26 @@ export function LockScreen({
   const { t } = useI18n();
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
+  const [bioHint, setBioHint] = useState('');
   const onBiometricsRef = useRef(onBiometrics);
+  const pinFallbackHintRef = useRef(t('lock.usePinInstead'));
   onBiometricsRef.current = onBiometrics;
+  pinFallbackHintRef.current = t('lock.usePinInstead');
+
+  const tryBiometrics = async () => {
+    try {
+      const ok = await onBiometricsRef.current();
+      if (!ok) {
+        setBioHint(pinFallbackHintRef.current);
+      }
+    } catch {
+      setBioHint(pinFallbackHintRef.current);
+    }
+  };
 
   useEffect(() => {
     if (lockMode === 'biometrics' && biometricAvailable) {
-      void onBiometricsRef.current();
+      void tryBiometrics();
     }
   }, [lockMode, biometricAvailable]);
 
@@ -69,7 +84,7 @@ export function LockScreen({
         keyboardShouldPersistTaps="handled"
         bounces={false}
       >
-        <Text style={[styles.kicker, { color: colors.accent }]}>Halo</Text>
+        <Text style={[styles.kicker, { color: colors.accent }]}>{AppConfig.productName}</Text>
         <Text style={[styles.title, { color: colors.ink }]}>{t('lock.screenTitle')}</Text>
         <Text style={[styles.body, { color: colors.muted }]}>
           {lockMode === 'biometrics' && biometricAvailable
@@ -77,10 +92,11 @@ export function LockScreen({
             : t('lock.screenPin')}
         </Text>
         {lockMode === 'biometrics' && biometricAvailable ? (
-          <Pressable onPress={() => void onBiometricsRef.current()} style={[raisedSurface(colors, 20), styles.bio]}>
+          <Pressable onPress={() => void tryBiometrics()} style={[raisedSurface(colors, 20), styles.bio]}>
             <Text style={[styles.bioLabel, { color: colors.accent }]}>{t('lock.unlockWith', { label: biometricLabel })}</Text>
           </Pressable>
         ) : null}
+        {bioHint ? <Text style={[styles.body, { color: colors.muted }]}>{bioHint}</Text> : null}
         <PinPad
           value={pin}
           onChange={(next) => {

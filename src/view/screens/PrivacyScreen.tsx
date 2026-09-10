@@ -8,7 +8,7 @@ import { useThemeColors } from '../theme/ThemeProvider';
 import { fonts } from '../theme/tokens';
 
 /**
- * Purpose: one quiet privacy screen — no cloud account, everything stays on this phone.
+ * Purpose: one-screen privacy note — stays on this phone, nothing uploaded.
  * Inputs: none.
  * Outputs: You → Privacy copy.
  * Side effects: none.
@@ -24,6 +24,10 @@ export function PrivacyScreen() {
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 32 }]}
         showsVerticalScrollIndicator={false}
       >
+        <Text style={[styles.headline, { color: colors.ink }]}>{t('onboarding.staysOnPhone')}</Text>
+        <Text style={[styles.lede, { color: colors.muted }]}>
+          {t('you.stays', { name: AppConfig.productName })}
+        </Text>
         <Text style={[styles.lede, { color: colors.muted }]}>{t('privacy.lede')}</Text>
         <Text style={[styles.body, { color: colors.ink }]}>
           {t('privacy.body1', { name: AppConfig.productName })}
@@ -41,6 +45,7 @@ export function PrivacyScreen() {
 
 const styles = StyleSheet.create({
   content: { paddingHorizontal: 22, gap: 16 },
+  headline: { fontFamily: fonts.display, fontSize: 36, lineHeight: 42 },
   lede: { fontFamily: fonts.bodySemi, fontSize: 18, lineHeight: 26 },
   body: { fontFamily: fonts.body, fontSize: 17, lineHeight: 26 },
 });

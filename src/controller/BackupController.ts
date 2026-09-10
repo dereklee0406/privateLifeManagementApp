@@ -117,6 +117,7 @@ export class BackupController {
     await this.reminderScheduler.syncSchedules({
       playSound: resolveReminderSoundEnabled(settings),
       redactLockScreen: settings.lockMode !== 'off',
+      permissionTrigger: 'restore',
     });
   }
 

@@ -11,7 +11,9 @@ import {
   formatFriendlyMoney,
   formatMoney,
   resolveExpenseCategories,
+  type Expense,
   type ExpenseCategory,
+  type ExpenseCategoryConfig,
 } from '../../model/finance/Expense';
 import {
   budgetProgressFor,
@@ -25,10 +27,11 @@ import { computeNetWorth } from '../../model/finance/netWorth';
 import { quickAddCategoryIds } from '../../model/finance/expenseCategories';
 import { recurringSpendChipLabel } from '../../model/finance/recurringSpend';
 import { computeMonthSpendInsight } from '../../model/finance/monthInsights';
-import { formatExpenseSpendLine } from '../../model/finance/fx';
+import { ESTIMATE_CURRENCY, formatExpenseSpendLine, hasExpenseFxSnapshot } from '../../model/finance/fx';
 import { summarizeSplit, type ExpenseSplit } from '../../model/finance/ExpenseSplit';
 import { resolveShowAdvancedFinance, resolveCardFxFeeRate } from '../../model/settings/AppSettings';
 import { budgetMonthFromDate, dateFromBudgetMonth } from '../../controller/dateFieldValue';
+import { formatShortDate, isoAtLocalNoon, toDayKey } from '../../utils/dateUtils';
 import { appHref } from '../../utils/navigation';
 import { hapticLight, hapticSuccess } from '../../utils/haptics';
 import { Chip } from '../components/Chip';
@@ -45,7 +48,7 @@ import { LargeTitle } from '../components/LargeTitle';
 import { TypeIcon } from '../components/TypeIcon';
 import { iconForExpenseCategory, expenseCategoryLabel, type TypeIconName } from '../icons/typeIcons';
 import { useThemeColors } from '../theme/ThemeProvider';
-import { fonts, insetSurface, raisedAccent, raisedSurface } from '../theme/tokens';
+import { fonts, insetSurface, raisedAccent, raisedSurface, type ThemeColors } from '../theme/tokens';
 import { tabScenePaddingBottom, type } from '../theme/typography';
 import { useI18n, type Translate } from '../i18n';
 import { PaymentCardsScreen } from './PaymentCardsScreen';
@@ -69,23 +72,84 @@ function parseMoneySegment(raw: string | string[] | undefined): MoneyHubSegment 
 }
 
 /**
- * Purpose: append a subtle pending-split badge to spend row meta when collections remain.
- * Inputs: base meta string, optional split, translator.
- * Outputs: meta with `split.splitBadge` when pendingAmount > 0; otherwise unchanged.
+ * Purpose: pending-split footnote for a spend row when collections remain.
+ * Inputs: optional split, translator.
+ * Outputs: `split.splitBadge` copy, or empty when settled / absent.
  * Side effects: none.
  */
-function spendMetaWithSplit(base: string, split: ExpenseSplit | undefined, t: Translate): string {
+function spendSplitLabel(split: ExpenseSplit | undefined, t: Translate): string {
   if (!split) {
-    return base;
+    return '';
   }
   const summary = summarizeSplit(split);
   if (summary.allSettled || summary.pendingAmount <= 0) {
-    return base;
+    return '';
   }
-  const badge = t('split.splitBadge', {
+  return t('split.splitBadge', {
     pending: formatFriendlyMoney(summary.pendingAmount, split.currency),
   });
-  return base ? `${base} · ${badge}` : badge;
+}
+
+/**
+ * Purpose: cluster already-sorted spends into consecutive day buckets for list headers.
+ * Inputs: expenses newest-day-first (same order as `filterExpenses`).
+ * Outputs: [{ dayKey, items }] preserving input order.
+ * Side effects: none.
+ */
+function groupSpendsByDay(items: Expense[]): { dayKey: string; items: Expense[] }[] {
+  const groups: { dayKey: string; items: Expense[] }[] = [];
+  for (const item of items) {
+    const tail = groups[groups.length - 1];
+    if (tail && tail.dayKey === item.dayKey) {
+      tail.items.push(item);
+    } else {
+      groups.push({ dayKey: item.dayKey, items: [item] });
+    }
+  }
+  return groups;
+}
+
+/**
+ * Purpose: day-group heading — Today / Yesterday / localized short date.
+ * Inputs: YYYY-MM-DD key, now, Intl locale, translator.
+ * Outputs: `date.today`, `date.yesterday`, or `formatShortDate` (e.g. 9 Sep).
+ * Side effects: none.
+ * Design decisions: reuses catalog keys + dateUtils; no English-only fallbacks in the view.
+ */
+function spendDayHeading(dayKey: string, now: Date, intlLocale: string, t: Translate): string {
+  if (dayKey === toDayKey(now)) {
+    return t('date.today');
+  }
+  const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+  if (dayKey === toDayKey(yesterday)) {
+    return t('date.yesterday');
+  }
+  return formatShortDate(isoAtLocalNoon(dayKey), intlLocale);
+}
+
+/**
+ * Purpose: glanceable “what” for a spend — merchant/note wins, else localized category.
+ * Inputs: expense, already-localized category label.
+ * Outputs: single primary title string.
+ * Side effects: none.
+ */
+function spendPrimaryTitle(item: Expense, categoryLabel: string): string {
+  const note = item.note?.trim();
+  return note || categoryLabel;
+}
+
+/**
+ * Purpose: muted FX estimate line under a foreign amount (`≈ HK$7.92`).
+ * Inputs: saved expense with optional locked snapshot.
+ * Outputs: estimate string, or undefined for HKD / missing lock.
+ * Side effects: none.
+ * Design decisions: `≈` is a symbol, not copy; amount uses `formatFriendlyMoney`.
+ */
+function spendFxEstimateLine(item: Expense): string | undefined {
+  if (!hasExpenseFxSnapshot(item) || item.homeAmount === undefined) {
+    return undefined;
+  }
+  return `≈ ${formatFriendlyMoney(item.homeAmount, ESTIMATE_CURRENCY)}`;
 }
 
 /**
@@ -99,7 +163,7 @@ function spendMetaWithSplit(base: string, split: ExpenseSplit | undefined, t: Tr
  *   external links. Cashflow focus chips drop the old Cards filter (cards have their own tab).
  */
 export function MoneyScreen() {
-  const { t } = useI18n();
+  const { t, intlLocale } = useI18n();
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -384,26 +448,17 @@ export function MoneyScreen() {
                       onAction={() => router.push('/expense/new')}
                     />
                   ) : (
-                    visibleExpenses.map((item) => (
-                      <Pressable
-                        key={item.id}
-                        onPress={() => router.push(appHref(`/expense/${item.id}`))}
-                        accessibilityLabel={t('money.editSpendA11y', { spend: formatExpenseSpendLine(item) })}
-                      >
-                        <Row
-                          title={formatExpenseSpendLine(item)}
-                          meta={spendMetaWithSplit(
-                            `${item.dayKey}${item.note ? ` · ${item.note}` : ''}`,
-                            splitsByExpenseId.get(item.id),
-                            t,
-                          )}
-                          cardName={item.cardId ? cardNameById.get(item.cardId) : undefined}
-                          typeId={item.category}
-                          icon={iconForExpenseCategory(item.category, expenseCatalog)}
-                          colors={colors}
-                        />
-                      </Pressable>
-                    ))
+                    <SpendsList
+                      items={visibleExpenses}
+                      expenseCatalog={expenseCatalog}
+                      cardNameById={cardNameById}
+                      splitsByExpenseId={splitsByExpenseId}
+                      colors={colors}
+                      intlLocale={intlLocale}
+                      t={t}
+                      now={now}
+                      onOpen={(item) => router.push(appHref(`/expense/${item.id}`))}
+                    />
                   )}
                 </>
               ) : monthSpends.length === 0 ? (
@@ -414,26 +469,17 @@ export function MoneyScreen() {
                   onAction={() => router.push('/expense/new')}
                 />
               ) : (
-                monthSpends.map((item) => (
-                  <Pressable
-                    key={item.id}
-                    onPress={() => router.push(appHref(`/expense/${item.id}`))}
-                    accessibilityLabel={t('money.editSpendA11y', { spend: formatExpenseSpendLine(item) })}
-                  >
-                    <Row
-                      title={formatExpenseSpendLine(item)}
-                      meta={spendMetaWithSplit(
-                        item.note ? `${item.dayKey} · ${item.note}` : item.dayKey,
-                        splitsByExpenseId.get(item.id),
-                        t,
-                      )}
-                      cardName={item.cardId ? cardNameById.get(item.cardId) : undefined}
-                      typeId={item.category}
-                      icon={iconForExpenseCategory(item.category, expenseCatalog)}
-                      colors={colors}
-                    />
-                  </Pressable>
-                ))
+                <SpendsList
+                  items={monthSpends}
+                  expenseCatalog={expenseCatalog}
+                  cardNameById={cardNameById}
+                  splitsByExpenseId={splitsByExpenseId}
+                  colors={colors}
+                  intlLocale={intlLocale}
+                  t={t}
+                  now={now}
+                  onOpen={(item) => router.push(appHref(`/expense/${item.id}`))}
+                />
               )}
             </Section>
           ) : null}
@@ -637,8 +683,149 @@ function Section({
 }
 
 /**
- * Purpose: one transaction / income / transfer glass row for Cashflow lists.
- * Inputs: title, meta, optional type icon + card badge, theme colors.
+ * Purpose: day-grouped spend list for the Cashflow Spends section.
+ * Inputs: filtered expenses, catalog, card names, splits, theme, locale, open handler.
+ * Outputs: Today / Yesterday / short-date headers plus glanceable SpendRows.
+ * Side effects: onOpen when a row is pressed.
+ */
+function SpendsList({
+  items,
+  expenseCatalog,
+  cardNameById,
+  splitsByExpenseId,
+  colors,
+  intlLocale,
+  t,
+  now,
+  onOpen,
+}: {
+  items: Expense[];
+  expenseCatalog: ExpenseCategoryConfig[];
+  cardNameById: Map<string, string>;
+  splitsByExpenseId: Map<string, ExpenseSplit>;
+  colors: ThemeColors;
+  intlLocale: string;
+  t: Translate;
+  now: Date;
+  onOpen: (item: Expense) => void;
+}) {
+  return (
+    <>
+      {groupSpendsByDay(items).map((group) => (
+        <View key={group.dayKey} style={styles.dayGroup}>
+          <Text style={[styles.dayHeader, { color: colors.muted }]} accessibilityRole="header">
+            {spendDayHeading(group.dayKey, now, intlLocale, t)}
+          </Text>
+          {group.items.map((item) => {
+            const categoryLabel = expenseCategoryLabel(t, item.category, expenseCatalog);
+            return (
+              <SpendRow
+                key={item.id}
+                item={item}
+                categoryLabel={categoryLabel}
+                icon={iconForExpenseCategory(item.category, expenseCatalog)}
+                cardName={item.cardId ? cardNameById.get(item.cardId) : undefined}
+                splitLabel={spendSplitLabel(splitsByExpenseId.get(item.id), t)}
+                paidCashLabel={t('spend.paidCash')}
+                colors={colors}
+                accessibilityLabel={t('money.editSpendA11y', {
+                  spend: `${spendPrimaryTitle(item, categoryLabel)}, ${formatExpenseSpendLine(item)}`,
+                })}
+                onPress={() => onOpen(item)}
+              />
+            );
+          })}
+        </View>
+      ))}
+    </>
+  );
+}
+
+/**
+ * Purpose: banking-style spend row — what left, amount right, how-paid secondary.
+ * Inputs: expense, localized category, optional card, split footnote, theme, press handler.
+ * Outputs: tactile neumorph row; presentation only.
+ * Side effects: onPress → `/expense/[id]` via parent.
+ * Design decisions: note/merchant is primary when present (category stays on the icon);
+ *   date lives on the day header so rows do not repeat ISO keys; FX estimate is a second
+ *   right-aligned line so foreign amounts are never cramped into the title.
+ */
+function SpendRow({
+  item,
+  categoryLabel,
+  icon,
+  cardName,
+  splitLabel,
+  paidCashLabel,
+  colors,
+  accessibilityLabel,
+  onPress,
+}: {
+  item: Expense;
+  categoryLabel: string;
+  icon: TypeIconName;
+  cardName?: string;
+  splitLabel: string;
+  paidCashLabel: string;
+  colors: ThemeColors;
+  accessibilityLabel: string;
+  onPress: () => void;
+}) {
+  const title = spendPrimaryTitle(item, categoryLabel);
+  const amountLabel = formatFriendlyMoney(item.amount, item.currency);
+  const fxLine = spendFxEstimateLine(item);
+  const paidName = cardName ?? paidCashLabel;
+  const paidIcon: TypeIconName = cardName ? 'card-outline' : 'cash-outline';
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      style={({ pressed }) => [
+        styles.spendPress,
+        {
+          transform: [{ scale: pressed ? 0.98 : 1 }],
+          opacity: pressed ? 0.88 : 1,
+        },
+      ]}
+    >
+      <GlassSurface style={styles.spendRowCard} radius={18}>
+        <View style={styles.spendRowInner}>
+          <View style={[insetSurface(colors, 20), styles.iconWell]} accessible={false} importantForAccessibility="no">
+            <TypeIcon typeId={item.category} icon={icon} />
+          </View>
+          <View style={styles.spendCopy}>
+            <Text style={[styles.spendTitle, { color: colors.ink }]} numberOfLines={1}>
+              {title}
+            </Text>
+            <View style={styles.spendSecondary}>
+              <SpendCardBadge name={paidName} icon={paidIcon} />
+              {splitLabel ? (
+                <Text style={[styles.splitChip, { color: colors.muted }]} numberOfLines={1}>
+                  · {splitLabel}
+                </Text>
+              ) : null}
+            </View>
+          </View>
+          <View style={styles.amountCol}>
+            <Text style={[styles.spendAmount, { color: colors.ink }]} numberOfLines={1}>
+              {amountLabel}
+            </Text>
+            {fxLine ? (
+              <Text style={[styles.spendFx, { color: colors.muted }]} numberOfLines={2}>
+                {fxLine}
+              </Text>
+            ) : null}
+          </View>
+        </View>
+      </GlassSurface>
+    </Pressable>
+  );
+}
+
+/**
+ * Purpose: one income / transfer glass row for Cashflow lists.
+ * Inputs: title, meta, optional type icon, theme colors.
  * Outputs: GlassSurface row; presentation only.
  * Side effects: none.
  */
@@ -648,13 +835,11 @@ function Row({
   colors,
   typeId,
   icon,
-  cardName,
 }: {
   title: string;
   meta: string;
   typeId?: string;
   icon?: TypeIconName;
-  cardName?: string;
   colors: { ink: string; muted: string };
 }) {
   return (
@@ -664,7 +849,6 @@ function Row({
         <View style={styles.rowCopy}>
           <Text style={[styles.rowTitle, { color: colors.ink }]}>{title}</Text>
           {meta ? <Text style={[styles.meta, { color: colors.muted }]}>{meta}</Text> : null}
-          {cardName ? <SpendCardBadge name={cardName} /> : null}
         </View>
       </View>
     </GlassSurface>
@@ -722,6 +906,45 @@ const styles = StyleSheet.create({
   rowInner: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   rowCopy: { flex: 1, minWidth: 0, gap: 4 },
   rowTitle: { fontFamily: fonts.bodySemi, fontSize: 16, lineHeight: 22, fontVariant: ['tabular-nums'] },
+  dayGroup: { gap: 8 },
+  dayHeader: {
+    fontFamily: fonts.bodySemi,
+    fontSize: 13,
+    lineHeight: 18,
+    letterSpacing: 0.3,
+    paddingHorizontal: 4,
+    paddingTop: 2,
+  },
+  spendPress: { width: '100%' },
+  spendRowCard: { paddingVertical: 12, paddingHorizontal: 14, minHeight: 56 },
+  spendRowInner: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 44 },
+  iconWell: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  spendCopy: { flex: 1, minWidth: 0, gap: 3 },
+  spendTitle: { fontFamily: fonts.bodySemi, fontSize: 16, lineHeight: 22 },
+  spendSecondary: { flexDirection: 'row', alignItems: 'center', gap: 6, minWidth: 0 },
+  splitChip: { fontFamily: fonts.body, fontSize: 13, lineHeight: 18, flexShrink: 1 },
+  amountCol: { alignItems: 'flex-end', flexShrink: 0, maxWidth: '46%', gap: 2 },
+  spendAmount: {
+    fontFamily: fonts.display,
+    fontSize: 17,
+    lineHeight: 22,
+    fontVariant: ['tabular-nums'],
+    textAlign: 'right',
+  },
+  spendFx: {
+    fontFamily: fonts.body,
+    fontSize: 13,
+    lineHeight: 17,
+    fontVariant: ['tabular-nums'],
+    textAlign: 'right',
+  },
   inline: { flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' },
   field: { flexGrow: 1, minWidth: 90, minHeight: 44, fontFamily: fonts.body, fontSize: 16, paddingHorizontal: 12, paddingVertical: 10, fontVariant: ['tabular-nums'] },
   addSpend: { minHeight: 56, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },

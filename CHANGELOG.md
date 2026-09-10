@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-09-10
+- Date: 2026-09-10
+- Description: **Glanceable Money Spends list** — Redesigned Cashflow spend rows so “what / how much / when / how paid” reads in one second: day-group headers (`date.today` / `date.yesterday` / `formatShortDate`), note-or-category primary title, right-aligned tabular amount with a second FX estimate line for foreign spends, and a glanceable card/cash badge. Tactile press (scale + opacity) still opens `/expense/[id]`. New `date.yesterday` key with parity across en / zh-Hant / zh-Hans / ja.
+- Affected modules: View (`MoneyScreen.tsx`, `SpendCardBadge.tsx`); i18n (`en.ts`, `zh-Hant.ts`, `zh-Hans.ts`, `ja.ts`); CHANGELOG
+- Reason: UX — amount-first ISO rows made scanning “what I spent” hard; duplicate Lunch cards had almost no visual distinction
+- Impact: Medium
+
+## 2026-09-10
+- Date: 2026-09-10
+- Description: **Store-ready polish** — Halo display name stays consistent; splash/adaptive-icon wash matches paper (`#E8E2D6`) and dark (`#2C2B28`) with `resizeMode: contain` and light/dark splash plugin variants (raster files in `assets/` are still Expo starter marks — need a designer Halo PNG). Privacy onboarding + Settings/Privacy lead with “stays on this phone / nothing uploaded.” Notification permission prompts only when she enables a reminder or taps Allow — not on cold start, foreground, sound flip, or restore. Sound vs silent still follows Customize. Lock PIN remains the fail-open path after a biometric cancel; Android back pops via `leaveScreen` and cannot dismiss the lock gate. Backup idle/export/import copy makes the write-down-password + new-phone restore path explicit. Splash hides only after settings + auth (unchanged).
+- Affected modules: Config (`app.json`, `appConfig.ts`); Routes (`app/_layout.tsx`); Controller (`ReminderController.ts`, `ReminderProvider.tsx`, `BackupController.ts`); Data (`reminderNotifications.native.ts`, `reminderNotifications.web.ts`); Model (`notificationPermission.ts`, lock-after tests); View (`LockScreen.tsx`, `PrivacyScreen.tsx`, `BackupPanel.tsx`, `NotificationObserver.native.tsx`, `AndroidBackBridge.tsx`, `RhythmTasksPanel.tsx`); Utils (`navigation.ts` tests); i18n (en / zh-Hant / zh-Hans / ja); CHANGELOG
+- Reason: Store / sideload trust — icon/splash brand, privacy one-liner, notifications that fire without a launch prompt, lock that always unlocks, backup she can restore, Android back that does not freeze
+- Impact: Medium
+
 ## 2026-09-09
 - Date: 2026-09-09
 - Description: **Global Fast Capture Sheet** — Unified Today FAB into a contextual creation hub (`GlobalFastCaptureSheet`) with four neumorphic tiles: Journal Story (`/compose?mode=text`), Log Spend (handoff to `QuickSpendSheet`), New Habit / Task (`/reminders/new`), and Transfer Funds (`/transfer/new`). Sheet uses `SheetChrome`, tactile scale-0.97 press + light haptic, and full `capture.*` i18n parity across en / zh-Hant / zh-Hans / ja.

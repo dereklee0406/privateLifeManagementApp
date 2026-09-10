@@ -28,6 +28,8 @@ interface ReminderContextValue {
   creditCards: CreditCardAccount[];
   notificationsLive: boolean;
   syncSchedules: () => Promise<boolean>;
+  /** User tap — may show the OS notification permission dialog. */
+  requestOsPings: () => Promise<boolean>;
   listTemplates: () => ReminderTemplate[];
   applyTemplate: (id: ReminderTemplateId | string) => ReminderDraft;
   nextFire: (reminder: Reminder) => Date | null;
@@ -111,7 +113,7 @@ export function ReminderProvider({ children }: { children: ReactNode }) {
         title: privateTitle,
         body: privateBody,
       });
-      const live = await controller.syncSchedules(scheduleOptions);
+      const live = await controller.syncSchedules({ ...scheduleOptions, permissionTrigger: 'coldStart' });
       setNotificationsLive(live);
     })();
   }, [controller, settingsReady, scheduleOptions]);
@@ -125,7 +127,9 @@ export function ReminderProvider({ children }: { children: ReactNode }) {
           title: privateTitle,
           body: privateBody,
         });
-        void controller.syncSchedules(scheduleOptions).then(setNotificationsLive);
+        void controller
+          .syncSchedules({ ...scheduleOptions, permissionTrigger: 'foreground' })
+          .then(setNotificationsLive);
       }
     });
     return () => sub.remove();
@@ -139,7 +143,19 @@ export function ReminderProvider({ children }: { children: ReactNode }) {
       notificationsLive,
       syncSchedules: async () => {
         controller.configureSound(playSound);
-        const live = await controller.syncSchedules(scheduleOptions);
+        const live = await controller.syncSchedules({
+          ...scheduleOptions,
+          permissionTrigger: 'soundChange',
+        });
+        setNotificationsLive(live);
+        return live;
+      },
+      requestOsPings: async () => {
+        controller.configureSound(playSound);
+        const live = await controller.syncSchedules({
+          ...scheduleOptions,
+          permissionTrigger: 'userEnable',
+        });
         setNotificationsLive(live);
         return live;
       },

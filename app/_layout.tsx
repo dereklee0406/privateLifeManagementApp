@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { Platform, View } from 'react-native';
+import { AppConfig } from '@/config/appConfig';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
@@ -13,6 +14,7 @@ import { ReminderProvider } from '@/controller/ReminderProvider';
 import { SettingsProvider, useSettings } from '@/controller/SettingsProvider';
 import { I18nProvider } from '@/view/i18n';
 import { TrashProvider } from '@/controller/TrashProvider';
+import { AndroidBackBridge } from '@/view/components/AndroidBackBridge';
 import { NotificationObserver } from '@/view/components/NotificationObserver';
 import { ThemeProvider, useThemeColors } from '@/view/theme/ThemeProvider';
 import { TypographyProvider } from '@/view/theme/TypographyProvider';
@@ -101,13 +103,14 @@ function RootNavigation() {
   }, [canReveal]);
 
   if (!canReveal) {
-    return <View style={{ flex: 1, backgroundColor: '#0A0B10' }} />;
+    return <View style={{ flex: 1, backgroundColor: AppConfig.brand.splashDark }} />;
   }
 
   return (
     <>
       <AuthGate />
       <ThemedChrome />
+      <AndroidBackBridge />
       <NotificationObserver />
       <Stack
         initialRouteName={settings.onboardingComplete ? '(tabs)' : 'onboarding'}

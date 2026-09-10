@@ -16,14 +16,18 @@ export function NotificationObserver() {
         router.push(url as `/compose`);
       }
     };
-    const last = Notifications.getLastNotificationResponse();
-    if (last?.notification) {
-      redirect(last.notification.request.content.data?.url);
+    try {
+      const last = Notifications.getLastNotificationResponse();
+      if (last?.notification) {
+        redirect(last.notification.request.content.data?.url);
+      }
+      const sub = Notifications.addNotificationResponseReceivedListener((response) => {
+        redirect(response.notification.request.content.data?.url);
+      });
+      return () => sub.remove();
+    } catch {
+      return undefined;
     }
-    const sub = Notifications.addNotificationResponseReceivedListener((response) => {
-      redirect(response.notification.request.content.data?.url);
-    });
-    return () => sub.remove();
   }, []);
   return null;
 }

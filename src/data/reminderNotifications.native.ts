@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { AppConfig } from '../config/appConfig';
+import { shouldRequestNotificationPermission } from '../model/reminders/notificationPermission';
 
 export interface ReminderNotificationFire {
   reminderId: string;
@@ -44,6 +45,18 @@ export function setReminderNotificationSound(enabled: boolean): void {
 }
 
 /**
+ * Purpose: read the current OS notification grant without showing a dialog.
+ * Inputs: none.
+ * Outputs: true when alerts are already allowed.
+ * Side effects: none (getPermissionsAsync only).
+ * Design decisions: cold start and foreground resync use this so Halo never prompts on launch.
+ */
+export async function hasReminderPermission(): Promise<boolean> {
+  const existing = await Notifications.getPermissionsAsync();
+  return permissionGranted(existing);
+}
+
+/**
  * Purpose: create Android channels then ask for POST_NOTIFICATIONS / iOS alert permission.
  * Inputs: none.
  * Outputs: true when the OS grants alerts.
@@ -60,6 +73,21 @@ export async function requestReminderPermission(): Promise<boolean> {
     ios: { allowAlert: true, allowBadge: true, allowSound: true },
   });
   return permissionGranted(settings);
+}
+
+/**
+ * Purpose: pick check-only vs prompt for a schedule sync.
+ * Inputs: trigger from ReminderController (userEnable vs launch/sound/restore).
+ * Outputs: true when the OS will show banners.
+ * Side effects: requestPermissionsAsync only for userEnable; otherwise getPermissionsAsync.
+ */
+export async function ensureReminderPermission(
+  trigger: Parameters<typeof shouldRequestNotificationPermission>[0],
+): Promise<boolean> {
+  if (shouldRequestNotificationPermission(trigger)) {
+    return requestReminderPermission();
+  }
+  return hasReminderPermission();
 }
 
 function permissionGranted(settings: Notifications.NotificationPermissionsStatus): boolean {
@@ -105,7 +133,7 @@ export async function syncReminderNotifications(
             title: fire.title,
             body: fire.body,
             data: { url: fire.url },
-            sound: playSound ? 'default' : undefined,
+            sound: playSound ? 'default' : false,
           },
           trigger: {
             type: Notifications.SchedulableTriggerInputTypes.DATE,

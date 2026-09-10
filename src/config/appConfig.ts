@@ -9,6 +9,14 @@
 export const AppConfig = {
   productName: 'Halo',
   tagline: 'Write, remember, and keep track — on this phone',
+  /**
+   * Splash / adaptive-icon wash. Matches ThemeTokens paper (light #E8E2D6, dark #2C2B28).
+   * Raster files in assets/ are still Expo starter marks — replace with a Halo PNG before store.
+   */
+  brand: {
+    splashLight: '#E8E2D6',
+    splashDark: '#2C2B28',
+  },
   storage: {
     entriesKey: 'halo.journal.entries.v1',
     settingsKey: 'halo.journal.settings.v1',
