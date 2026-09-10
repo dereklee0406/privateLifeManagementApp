@@ -12,9 +12,12 @@ import type { Expense, ExpenseDraft } from '../model/finance/Expense';
 import type { ExpenseSplit, ExpenseSplitDraft } from '../model/finance/ExpenseSplit';
 import type { IncomeDraft, IncomeEntry } from '../model/finance/Income';
 import type { Loan, LoanDraft } from '../model/finance/Loan';
+import type { CardDebtInput } from '../model/finance/netWorth';
+import type { NetWorthHistoryRow } from '../model/finance/netWorthHistory';
+import type { SavingsTarget, SavingsTargetDraft } from '../model/finance/savingsTarget';
 import type { TransferDraft, TransferEntry } from '../model/finance/Transfer';
 import { expenseNeedsFxSnapshot, type FxRateTable } from '../model/finance/fx';
-import { resolveCardFxFeeRate } from '../model/settings/AppSettings';
+import { resolveCardFxFeeRate, type MoneyCurrency } from '../model/settings/AppSettings';
 import { useFxRates } from './FxRateProvider';
 import { useSettings } from './SettingsProvider';
 
@@ -25,6 +28,8 @@ interface FinanceContextValue {
   budgets: Budget[];
   assets: Asset[];
   loans: Loan[];
+  savingsTarget: SavingsTarget | undefined;
+  netWorthHistory: NetWorthHistoryRow[];
   recurringSpends: RecurringSpend[];
   transfers: TransferEntry[];
   splits: ExpenseSplit[];
@@ -46,6 +51,13 @@ interface FinanceContextValue {
   createLoan: (draft: LoanDraft) => Promise<Loan>;
   updateLoan: (id: string, draft: LoanDraft) => Promise<Loan>;
   deleteLoan: (id: string) => Promise<void>;
+  upsertSavingsTarget: (draft: SavingsTargetDraft) => Promise<SavingsTarget>;
+  clearSavingsTarget: () => Promise<void>;
+  recordMonthlyNetWorthSnapshot: (
+    cards: CardDebtInput[],
+    currency: MoneyCurrency,
+    now?: Date,
+  ) => Promise<NetWorthHistoryRow[]>;
   transferFunds: (draft: TransferDraft) => Promise<TransferEntry>;
   deleteTransfer: (id: string) => Promise<void>;
   saveSplit: (draft: ExpenseSplitDraft) => Promise<ExpenseSplit>;
@@ -71,7 +83,7 @@ const FinanceContext = createContext<FinanceContextValue | null>(null);
 /**
  * Purpose: bind FinanceController to React.
  * Inputs: children tree.
- * Outputs: expenses, incomes, budgets, assets, loans, transfers, splits, recurring rules, mutators.
+ * Outputs: expenses, incomes, budgets, assets, loans, savings target, history, transfers, splits, mutators.
  * Side effects: loads and writes finance JSON; one-time FX snapshot backfill for legacy foreign spends.
  */
 export function FinanceProvider({ children }: { children: ReactNode }) {
@@ -84,18 +96,32 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [loans, setLoans] = useState<Loan[]>([]);
+  const [savingsTarget, setSavingsTarget] = useState<SavingsTarget | undefined>(undefined);
+  const [netWorthHistory, setNetWorthHistory] = useState<NetWorthHistoryRow[]>([]);
   const [recurringSpends, setRecurringSpends] = useState<RecurringSpend[]>([]);
   const [transfers, setTransfers] = useState<TransferEntry[]>([]);
   const [splits, setSplits] = useState<ExpenseSplit[]>([]);
 
   const refresh = async () => {
-    const [nextExpenses, nextIncomes, nextBudgets, nextAssets, nextLoans, nextRecurring, nextTransfers, nextSplits] =
-      await Promise.all([
+    const [
+      nextExpenses,
+      nextIncomes,
+      nextBudgets,
+      nextAssets,
+      nextLoans,
+      nextTarget,
+      nextHistory,
+      nextRecurring,
+      nextTransfers,
+      nextSplits,
+    ] = await Promise.all([
         controller.listExpenses(),
         controller.listIncomes(),
         controller.listBudgets(),
         controller.listAssets(),
         controller.listLoans(),
+        controller.getSavingsTarget(),
+        controller.listNetWorthHistory(),
         controller.listRecurringSpends(),
         controller.listTransfers(),
         controller.listSplits(),
@@ -110,6 +136,8 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     setBudgets(nextBudgets);
     setAssets(nextAssets);
     setLoans(nextLoans);
+    setSavingsTarget(nextTarget);
+    setNetWorthHistory(nextHistory);
     setRecurringSpends(nextRecurring);
     setTransfers(nextTransfers);
     setSplits(nextSplits);
@@ -144,6 +172,8 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       budgets,
       assets,
       loans,
+      savingsTarget,
+      netWorthHistory,
       recurringSpends,
       transfers,
       splits,
@@ -213,6 +243,20 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         await controller.deleteLoan(id);
         await refresh();
       },
+      upsertSavingsTarget: async (draft) => {
+        const saved = await controller.upsertSavingsTarget(draft);
+        await refresh();
+        return saved;
+      },
+      clearSavingsTarget: async () => {
+        await controller.clearSavingsTarget();
+        await refresh();
+      },
+      recordMonthlyNetWorthSnapshot: async (cards, currency, now) => {
+        const history = await controller.recordMonthlyNetWorthSnapshot(cards, currency, now);
+        await refresh();
+        return history;
+      },
       transferFunds: async (draft) => {
         const created = await controller.transferFunds(draft);
         await refresh();
@@ -281,6 +325,8 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       budgets,
       assets,
       loans,
+      savingsTarget,
+      netWorthHistory,
       recurringSpends,
       transfers,
       splits,

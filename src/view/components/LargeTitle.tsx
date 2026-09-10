@@ -3,7 +3,7 @@ import { useThemeColors } from '../theme/ThemeProvider';
 import { useTypography } from '../theme/TypographyProvider';
 
 /**
- * Purpose: iOS large title on root tabs (Today, Pages, Calendar, Money, Settings).
+ * Purpose: iOS large title on root tabs (Today, Journal, Rhythm, Wallet, Insights, Settings).
  * Inputs: title string; optional extra style.
  * Outputs: scaled largeTitle text from useTypography (Dynamic Type + user preference).
  * Side effects: none.

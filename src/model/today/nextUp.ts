@@ -64,13 +64,14 @@ export function dueStatusFromDays(days: number): NextUpDueStatus {
  * Inputs: reminder.
  * Outputs: local Date or null when the day key is unusable.
  * Side effects: none.
+ * Design decisions: civil day 1 is valid — `!day` would drop the 1st of the month.
  */
 export function onceFireAt(reminder: Reminder): Date | null {
   if (reminder.recurrence.type !== 'once') {
     return null;
   }
   const [year, month, day] = reminder.recurrence.dayKey.split('-').map(Number);
-  if (!year || !month || !day) {
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day) || day < 1) {
     return null;
   }
   return new Date(year, month - 1, day, reminder.hour, reminder.minute, 0, 0);

@@ -90,6 +90,77 @@ export function computeWritingDaysThisWeek(
 }
 
 /**
+ * Purpose: count distinct local days written in a trailing window ending today.
+ * Inputs: entries, now, window length in civil days (default 30, inclusive of today).
+ * Outputs: integer 0…windowDays.
+ * Side effects: none.
+ * Design decisions: a day with several pages still counts once; days before the window are ignored.
+ */
+export function computeWritingDaysInWindow(
+  entries: JournalEntry[],
+  now: Date = new Date(),
+  windowDays = 30,
+): number {
+  const safeWindow = Math.max(1, Math.floor(windowDays));
+  const todayMs = startOfLocalDay(now);
+  const startMs = startOfLocalDay(
+    new Date(now.getFullYear(), now.getMonth(), now.getDate() - (safeWindow - 1)),
+  );
+  const days = new Set<number>();
+  for (const entry of entries) {
+    const dayStart = startOfLocalDay(new Date(entry.createdAt));
+    if (dayStart >= startMs && dayStart <= todayMs) {
+      days.add(dayStart);
+    }
+  }
+  return days.size;
+}
+
+/**
+ * Purpose: count distinct local days written in a calendar month (1st through today or month end).
+ * Inputs: entries, year, month (0–11), now (clamps the end to today when in that month).
+ * Outputs: integer 0…days in month.
+ * Side effects: none.
+ */
+export function computeWritingDaysInMonth(
+  entries: JournalEntry[],
+  year: number,
+  month: number,
+  now: Date = new Date(),
+): number {
+  const monthStart = new Date(year, month, 1).getTime();
+  const monthEndExclusive = new Date(year, month + 1, 1).getTime();
+  const todayMs = startOfLocalDay(now);
+  const days = new Set<number>();
+  for (const entry of entries) {
+    const dayStart = startOfLocalDay(new Date(entry.createdAt));
+    if (dayStart < monthStart || dayStart >= monthEndExclusive) {
+      continue;
+    }
+    if (year === now.getFullYear() && month === now.getMonth() && dayStart > todayMs) {
+      continue;
+    }
+    days.add(dayStart);
+  }
+  return days.size;
+}
+
+/**
+ * Purpose: pages whose civil day sits in a calendar month.
+ * Inputs: entries, year, month (0–11).
+ * Outputs: matching pages (does not clamp to today).
+ * Side effects: none.
+ */
+export function entriesInMonth(entries: JournalEntry[], year: number, month: number): JournalEntry[] {
+  const prefix = `${year}-${String(month + 1).padStart(2, '0')}`;
+  return entries.filter((entry) => {
+    const created = new Date(entry.createdAt);
+    const key = `${created.getFullYear()}-${String(created.getMonth() + 1).padStart(2, '0')}`;
+    return key === prefix;
+  });
+}
+
+/**
  * Purpose: aggregate mood frequencies for insight charts.
  * Inputs: entries.
  * Outputs: MoodShare list sorted by count descending.

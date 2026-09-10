@@ -15,6 +15,7 @@ import { LocationField } from '../components/LocationField';
 import type { JournalLocation } from '../../model/journal/JournalEntry';
 import { useJournal } from '../../controller/JournalProvider';
 import type { MoodId } from '../../model/journal/Mood';
+import { isPromptId } from '../../model/journal/prompts';
 import { dateFromDayKey, journalCreatedAtFromDate } from '../../controller/dateFieldValue';
 import { toDayKey } from '../../utils/dateUtils';
 import { leaveScreen } from '../../utils/navigation';
@@ -23,6 +24,7 @@ import { MarkdownEditor } from '../components/MarkdownEditor';
 import { MoodPicker } from '../components/MoodPicker';
 import { MoodNoteField } from '../components/MoodNoteField';
 import { PhotoAttachments } from '../components/PhotoAttachments';
+import { PromptLibrarySheet } from '../components/PromptLibrarySheet';
 import { BackButton } from '../components/BackButton';
 import { DateField } from '../components/DateField';
 import { KeyboardDismissScrollView } from '../components/KeyboardDismissScrollView';
@@ -35,7 +37,7 @@ import { VoiceCapture, type VoiceCaptureValue } from '../components/VoiceCapture
 import { GlassSurface } from '../components/GlassSurface';
 import { useI18n } from '../i18n';
 import { useThemeColors } from '../theme/ThemeProvider';
-import { fonts, groupedRadius } from '../theme/tokens';
+import { fonts, groupedRadius, raisedSurface } from '../theme/tokens';
 import { type } from '../theme/typography';
 
 /**
@@ -49,9 +51,15 @@ export function ComposeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { t } = useI18n();
-  const { mode, date, prompt } = useLocalSearchParams<{ mode?: string; date?: string; prompt?: string }>();
+  const { mode, date, prompt, promptId } = useLocalSearchParams<{
+    mode?: string;
+    date?: string;
+    prompt?: string;
+    promptId?: string;
+  }>();
   const composeMode = mode === 'voice' || mode === 'text' ? mode : undefined;
   const dayKey = typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : undefined;
+  const starterId = typeof promptId === 'string' && isPromptId(promptId) ? promptId : undefined;
   const starter = typeof prompt === 'string' ? prompt : undefined;
 
   const go = (next: 'text' | 'voice') => {
@@ -85,7 +93,7 @@ export function ComposeScreen() {
         ) : composeMode === 'voice' ? (
           <VoiceComposeForm dayKey={dayKey} />
         ) : (
-          <TextComposeForm dayKey={dayKey} starter={starter} />
+          <TextComposeForm dayKey={dayKey} starter={starter} starterId={starterId} />
         )}
       </KeyboardAvoidingView>
       </SheetChrome>
@@ -93,21 +101,31 @@ export function ComposeScreen() {
   );
 }
 
-function TextComposeForm({ dayKey, starter }: { dayKey?: string; starter?: string }) {
+function TextComposeForm({
+  dayKey,
+  starter,
+  starterId,
+}: {
+  dayKey?: string;
+  starter?: string;
+  starterId?: string;
+}) {
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { t } = useI18n();
   const { createEntry } = useJournal();
+  const initialBody = starterId ? t(`prompts.${starterId}`) : (starter ?? '');
   const [mood, setMood] = useState<MoodId>('neutral');
   const [moodNote, setMoodNote] = useState('');
   const [title, setTitle] = useState('');
-  const [body, setBody] = useState(starter ?? '');
+  const [body, setBody] = useState(initialBody);
   const [tags, setTags] = useState<string[]>([]);
   const [photoUris, setPhotoUris] = useState<string[]>([]);
   const [voice, setVoice] = useState<VoiceCaptureValue | null>(null);
   const [location, setLocation] = useState<JournalLocation | undefined>();
   const [saving, setSaving] = useState(false);
+  const [promptOpen, setPromptOpen] = useState(false);
   const [pageDate, setPageDate] = useState(() => dateFromDayKey(dayKey ?? toDayKey(new Date())));
   const canSave = (body.trim().length > 0 || photoUris.length > 0 || Boolean(voice)) && !saving;
 
@@ -146,6 +164,18 @@ function TextComposeForm({ dayKey, starter }: { dayKey?: string; starter?: strin
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 32 }]}
       >
       <DateField label={t('compose.pageDay')} value={pageDate} onChange={setPageDate} />
+      <Pressable
+        onPress={() => setPromptOpen(true)}
+        accessibilityRole="button"
+        accessibilityLabel={t('compose.promptsA11y')}
+        style={({ pressed }) => [
+          raisedSurface(colors, 16),
+          styles.promptBtn,
+          { opacity: pressed ? 0.85 : 1 },
+        ]}
+      >
+        <Text style={[styles.promptLabel, { color: colors.accent }]}>{t('compose.prompts')}</Text>
+      </Pressable>
       <MoodPicker value={mood} onChange={setMood} />
       <MoodNoteField value={moodNote} onChange={setMoodNote} />
       <TextInput
@@ -174,6 +204,11 @@ function TextComposeForm({ dayKey, starter }: { dayKey?: string; starter?: strin
         disabled={!canSave}
       />
       </KeyboardDismissScrollView>
+      <PromptLibrarySheet
+        visible={promptOpen}
+        onClose={() => setPromptOpen(false)}
+        onPick={(prompt) => setBody(prompt)}
+      />
     </>
   );
 }
@@ -260,4 +295,12 @@ const styles = StyleSheet.create({
   choiceBody: { fontFamily: fonts.body, fontSize: 15, lineHeight: 22 },
   content: { paddingHorizontal: 22, gap: 14 },
   titleInput: { fontFamily: fonts.display, fontSize: 28, lineHeight: 34 },
+  promptBtn: {
+    minHeight: 44,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    alignSelf: 'flex-start',
+    justifyContent: 'center',
+  },
+  promptLabel: { fontFamily: fonts.bodySemi, fontSize: 15, lineHeight: 20 },
 });

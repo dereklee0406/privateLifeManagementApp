@@ -16,30 +16,24 @@ import { GlassSurface } from './GlassSurface';
 interface QuickMoodOption {
   key: string;
   mood: MoodId;
-  labelKey:
-    | 'home.moodRadiant'
-    | 'home.moodCalm'
-    | 'home.moodNeutral'
-    | 'home.moodFoggy'
-    | 'home.moodLow';
+  labelKey: 'home.moodGood' | 'home.moodSteady' | 'home.moodOff' | 'home.moodRough';
   emoji: string;
 }
 
-/** Soft 5-slot Home check-in mapped onto the 4 MoodId catalog. */
+/** Four-slot Home check-in mapped 1:1 onto MoodId. */
 const QUICK_MOODS: readonly QuickMoodOption[] = [
-  { key: 'radiant', mood: 'happy', labelKey: 'home.moodRadiant', emoji: '✨' },
-  { key: 'calm', mood: 'neutral', labelKey: 'home.moodCalm', emoji: '😌' },
-  { key: 'neutral', mood: 'neutral', labelKey: 'home.moodNeutral', emoji: '😐' },
-  { key: 'foggy', mood: 'sad', labelKey: 'home.moodFoggy', emoji: '🌫' },
-  { key: 'low', mood: 'angry', labelKey: 'home.moodLow', emoji: '🌧' },
+  { key: 'good', mood: 'happy', labelKey: 'home.moodGood', emoji: '😊' },
+  { key: 'steady', mood: 'neutral', labelKey: 'home.moodSteady', emoji: '😐' },
+  { key: 'off', mood: 'sad', labelKey: 'home.moodOff', emoji: '😔' },
+  { key: 'rough', mood: 'angry', labelKey: 'home.moodRough', emoji: '😡' },
 ] as const;
 
 /**
  * Purpose: 2-second inline mood check-in on Today Home (no full compose navigation).
  * Inputs: journal entries + createEntry / updateEntry.
- * Outputs: 5-slot segmented bar, optional one-line note, or today’s mood summary with edit.
+ * Outputs: 4-slot segmented bar, optional one-line note, or today’s mood summary with edit.
  * Side effects: persists a mood page (mood + moodNote); haptic on save.
- * Design decisions: View maps soft labels onto MoodId; Model still requires moodNote for empty-body saves.
+ * Design decisions: View maps Good / Steady / Off / Rough onto MoodId; Model still requires moodNote for empty-body saves.
  */
 export function QuickMoodBar() {
   const colors = useThemeColors();
@@ -104,9 +98,7 @@ export function QuickMoodBar() {
 
   if (todayMoodEntry && !pendingKey) {
     const def = getMoodDefinition(todayMoodEntry.mood);
-    const soft =
-      QUICK_MOODS.find((item) => item.mood === todayMoodEntry.mood && item.key !== 'calm') ??
-      QUICK_MOODS.find((item) => item.mood === todayMoodEntry.mood);
+    const soft = QUICK_MOODS.find((item) => item.mood === todayMoodEntry.mood);
     const label = soft ? t(soft.labelKey) : t(`mood.${todayMoodEntry.mood}`);
     return (
       <GlassSurface style={styles.card} radius={18}>
@@ -125,7 +117,7 @@ export function QuickMoodBar() {
           </View>
           <Pressable
             onPress={() => {
-              setPendingKey(soft?.key ?? 'neutral');
+              setPendingKey(soft?.key ?? 'steady');
               setNote(todayMoodEntry.moodNote ?? '');
             }}
             accessibilityRole="button"

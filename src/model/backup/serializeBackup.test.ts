@@ -146,3 +146,42 @@ describe('normalizeFinanceDocument / normalizeReminderDocument fallbacks', () =>
     assert.equal(fromObject.creditCards[0]?.id, 'c1');
   });
 });
+
+describe('backup goals collection', () => {
+  it('round-trips goals and treats missing goals on old v1 files as empty', () => {
+    const document = buildBackupDocument({
+      journal: [],
+      reminders: { reminders: [], creditCards: [] },
+      finance: emptyFinanceDocument(),
+      settings: DEFAULT_SETTINGS,
+      goals: [
+        {
+          id: 'g1',
+          title: 'Run a 10k',
+          why: 'Race',
+          targetDate: '2026-11-01',
+          linkedReminderIds: ['r1'],
+          status: 'active',
+          createdAt: '2026-01-01T00:00:00.000Z',
+          updatedAt: '2026-01-01T00:00:00.000Z',
+        },
+      ],
+      exportedAt: '2026-09-10T00:00:00.000Z',
+    });
+    const restored = parseBackupDocument(serializeBackupDocument(document));
+    assert.equal(restored.goals.length, 1);
+    assert.equal(restored.goals[0]?.title, 'Run a 10k');
+
+    const legacy = parseBackupDocument(
+      JSON.stringify({
+        version: 1,
+        exportedAt: '2026-03-15T12:00:00.000Z',
+        journal: [],
+        reminders: { reminders: [], creditCards: [] },
+        finance: emptyFinanceDocument(),
+        settings: DEFAULT_SETTINGS,
+      }),
+    );
+    assert.deepEqual(legacy.goals, []);
+  });
+});

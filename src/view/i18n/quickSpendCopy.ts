@@ -14,8 +14,8 @@ const TEMPLATE_LABEL_KEYS: Record<string, string> = {
  * Outputs: localized label; falls back to the Model's English label for unknown ids.
  * Side effects: none.
  * Design decisions: ids stay stable English in Model so usage stats can key off them later;
- *   the id → copy mapping lives in View i18n next to the catalogs, shared by QuickSpendSheet,
- *   InlineHomeQuickAdd, and the ExpenseEditScreen Quick Spend mode.
+ *   the id → copy mapping lives in View i18n next to the catalogs, shared by QuickSpendSheet
+ *   and the ExpenseEditScreen Quick Spend mode.
  */
 export function localizeQuickAddTemplateLabel(t: Translate, template: QuickAddTemplate): string {
   const key = TEMPLATE_LABEL_KEYS[template.id];

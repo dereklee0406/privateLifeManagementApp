@@ -8,6 +8,8 @@ import type { IncomeEntry, IncomeKind } from './Income';
 import type { Loan, LoanKind } from './Loan';
 import type { TransferEntry } from './Transfer';
 import { emptyFinanceDocument, type FinanceDocument } from './Account';
+import { normalizeNetWorthHistory } from './netWorthHistory';
+import { normalizeSavingsTarget } from './savingsTarget';
 import type { MoneyCurrency } from '../settings/AppSettings';
 
 const CURRENCIES: MoneyCurrency[] = ['HKD', 'USD', 'CNY'];
@@ -19,7 +21,7 @@ const LEGACY_ACCOUNT_KINDS = ['cash', 'bank', 'credit-card'] as const;
 /**
  * Purpose: hydrate the finance JSON document, including older monthly-income and account shapes.
  * Inputs: parsed unknown.
- * Outputs: expenses, incomes, budgets, assets, loans, transfers, splits.
+ * Outputs: expenses, incomes, budgets, assets, loans, transfers, splits, savings target, history.
  * Side effects: none.
  */
 export function normalizeFinanceDocument(raw: unknown): FinanceDocument {
@@ -57,6 +59,8 @@ export function normalizeFinanceDocument(raw: unknown): FinanceDocument {
     splits: Array.isArray(value.splits)
       ? value.splits.map(normalizeExpenseSplit).filter((item): item is ExpenseSplit => item !== null)
       : [],
+    savingsTarget: normalizeSavingsTarget(value.savingsTarget),
+    netWorthHistory: normalizeNetWorthHistory(value.netWorthHistory),
   };
 }
 

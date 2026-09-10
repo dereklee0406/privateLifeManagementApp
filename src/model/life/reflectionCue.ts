@@ -2,7 +2,8 @@ import { getDailyPrompt } from '../journal/prompts';
 
 export interface LifeReflectionCue {
   reason: 'budget' | 'quiet';
-  prompt: string;
+  /** Catalog id from getDailyPrompt — View localizes `prompts.{promptId}`. */
+  promptId: string;
   line: string;
 }
 
@@ -28,7 +29,7 @@ export function suggestLifeReflection(
   }
   return {
     reason: budgetOver ? 'budget' : 'quiet',
-    prompt: getDailyPrompt(now),
+    promptId: getDailyPrompt(now),
     line: GENTLE_LINE,
   };
 }

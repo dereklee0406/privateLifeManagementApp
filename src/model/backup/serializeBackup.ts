@@ -1,5 +1,7 @@
 import { emptyFinanceDocument, type FinanceDocument } from '../finance/Account';
 import { normalizeFinanceDocument } from '../finance/normalizeFinance';
+import type { Goal } from '../goals/Goal';
+import { normalizeGoals } from '../goals/normalizeGoal';
 import { normalizeEntries } from '../journal/normalizeEntry';
 import type { JournalEntry } from '../journal/JournalEntry';
 import { normalizeReminderDocument, type ReminderDocument } from '../reminders/normalizeReminder';
@@ -87,8 +89,8 @@ export function settingsForBackup(settings: AppSettings): AppSettings {
 }
 
 /**
- * Purpose: assemble a v1 inner document from the four stores.
- * Inputs: journal pages, reminder document, finance document, settings.
+ * Purpose: assemble a v1 inner document from the local stores.
+ * Inputs: journal pages, reminder document, finance document, settings, goals.
  * Outputs: BackupDocument ready to JSON.stringify then encrypt.
  * Side effects: none.
  */
@@ -97,6 +99,7 @@ export function buildBackupDocument(input: {
   reminders: ReminderDocument;
   finance: FinanceDocument;
   settings: AppSettings;
+  goals?: Goal[];
   exportedAt?: string;
 }): BackupDocument {
   return {
@@ -114,8 +117,13 @@ export function buildBackupDocument(input: {
       assets: input.finance.assets,
       loans: input.finance.loans,
       recurringSpends: input.finance.recurringSpends ?? [],
+      transfers: input.finance.transfers ?? [],
+      splits: input.finance.splits ?? [],
+      ...(input.finance.savingsTarget ? { savingsTarget: input.finance.savingsTarget } : {}),
+      netWorthHistory: input.finance.netWorthHistory ?? [],
     },
     settings: settingsForBackup(input.settings),
+    goals: input.goals ?? [],
   };
 }
 
@@ -174,6 +182,7 @@ export function parseBackupDocument(rawJson: string): BackupDocument {
   const reminders = normalizeReminderDocument(value.reminders);
   const finance = normalizeFinanceDocument(value.finance);
   const settings = parseBackupSettings(value.settings);
+  const goals = normalizeGoals(value.goals);
   const exportedAt = typeof value.exportedAt === 'string' && value.exportedAt ? value.exportedAt : new Date().toISOString();
 
   return {
@@ -183,6 +192,7 @@ export function parseBackupDocument(rawJson: string): BackupDocument {
     reminders,
     finance: finance ?? emptyFinanceDocument(),
     settings,
+    goals,
   };
 }
 

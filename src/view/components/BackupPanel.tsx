@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Alert, StyleSheet, Text, TextInput, View } from 'react-native';
 import { createBackupController } from '../../controller/BackupController';
 import { useFinance } from '../../controller/FinanceProvider';
+import { useGoals } from '../../controller/GoalProvider';
 import { useJournal } from '../../controller/JournalProvider';
 import { useReminders } from '../../controller/ReminderProvider';
 import { useSettings } from '../../controller/SettingsProvider';
@@ -37,6 +38,7 @@ export function BackupPanel() {
   const journal = useJournal();
   const reminders = useReminders();
   const finance = useFinance();
+  const goals = useGoals();
   const settings = useSettings();
   const backupStatus = readBackupStatus(settings.settings);
   const [mode, setMode] = useState<BackupMode>('idle');
@@ -134,7 +136,13 @@ export function BackupPanel() {
     setBusy(true);
     try {
       await controller.commitBackup(document);
-      await Promise.all([journal.refresh(), reminders.refresh(), finance.refresh(), settings.reload()]);
+      await Promise.all([
+        journal.refresh(),
+        reminders.refresh(),
+        finance.refresh(),
+        goals.refresh(),
+        settings.reload(),
+      ]);
       reset();
       Alert.alert(t('backup.restoredTitle'), t('backup.restoredBody'));
     } catch (caught) {

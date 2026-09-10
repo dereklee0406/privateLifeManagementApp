@@ -303,3 +303,50 @@ export function computeOverallHabitRhythm(reminders: Reminder[], todayKey: strin
     bestCurrentStreak,
   };
 }
+
+/**
+ * Purpose: mean check-in density for active habits in a closed civil-day window.
+ * Inputs: reminders, startKey / endKey (YYYY-MM-DD, inclusive).
+ * Outputs: rate 0–1, or null when there are no active recurring habits; plus habit count.
+ * Side effects: none.
+ * Design decisions: each habit scores unique hits in the window ÷ window length (min 1 day).
+ *   Missing habits do not zero the mean — they are omitted. Season uses the 30-day overall rate
+ *   instead; this helper is for week / month reports.
+ */
+export function habitHitRateBetween(
+  reminders: Reminder[],
+  startKey: string,
+  endKey: string,
+): { rate: number | null; activeHabitCount: number } {
+  const habits = reminders.filter(isActiveRecurringHabit);
+  if (habits.length === 0) {
+    return { rate: null, activeHabitCount: 0 };
+  }
+  const days = Math.max(1, inclusiveDayCount(startKey, endKey));
+  let sum = 0;
+  for (const habit of habits) {
+    const hits = uniqueSortedKeys(habit.completedDayKeys).filter(
+      (key) => key >= startKey && key <= endKey,
+    ).length;
+    const ratio = hits / days;
+    sum += ratio > 1 ? 1 : ratio < 0 ? 0 : ratio;
+  }
+  return { rate: sum / habits.length, activeHabitCount: habits.length };
+}
+
+/**
+ * Purpose: inclusive civil-day span between two YYYY-MM-DD keys.
+ * Inputs: start and end keys.
+ * Outputs: integer day count (0 when inverted / invalid).
+ * Side effects: none.
+ */
+function inclusiveDayCount(startKey: string, endKey: string): number {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(startKey) || !/^\d{4}-\d{2}-\d{2}$/.test(endKey) || endKey < startKey) {
+    return 0;
+  }
+  const [ys, ms, ds] = startKey.split('-').map(Number);
+  const [ye, me, de] = endKey.split('-').map(Number);
+  const start = Date.UTC(ys, (ms ?? 1) - 1, ds ?? 1);
+  const end = Date.UTC(ye, (me ?? 1) - 1, de ?? 1);
+  return Math.round((end - start) / 86_400_000) + 1;
+}

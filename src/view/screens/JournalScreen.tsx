@@ -15,8 +15,10 @@ import { useI18n } from '../i18n';
 import { EmptyState } from '../components/EmptyState';
 import { EntryCard } from '../components/EntryCard';
 import { GroupedRow, GroupedSection } from '../components/GroupedList';
+import { HubCaptureFab } from '../components/HubCaptureFab';
 import { HubSegmentControl, type HubSegmentOption } from '../components/HubSegmentControl';
 import { LargeTitle } from '../components/LargeTitle';
+import { PromptLibrarySheet } from '../components/PromptLibrarySheet';
 import { ScreenScaffold } from '../components/ScreenScaffold';
 import { SearchFilters } from '../components/SearchFilters';
 import { TypeIcon } from '../components/TypeIcon';
@@ -54,6 +56,7 @@ export function JournalScreen() {
   const [viewMode, setViewMode] = useState<JournalViewMode>('timeline');
   const [query, setQuery] = useState(emptySearchInput());
   const [filter, setFilter] = useState<GlobalSearchFilter>('all');
+  const [promptOpen, setPromptOpen] = useState(false);
 
   const viewOptions = useMemo(
     (): HubSegmentOption<JournalViewMode>[] => [
@@ -119,29 +122,51 @@ export function JournalScreen() {
       >
         <View style={styles.topRow}>
           <View style={styles.titleBlock}>
-            <Text style={[type.footnote, styles.headerKicker, { color: colors.accent }]}>
-              {t('pages.headerKicker')}
-            </Text>
+            {t('pages.headerKicker') ? (
+              <Text style={[type.footnote, styles.headerKicker, { color: colors.accent }]}>
+                {t('pages.headerKicker')}
+              </Text>
+            ) : null}
             <LargeTitle title={t('pages.headerTitle')} />
           </View>
-          <Pressable
-            onPress={() => {
-              void hapticLight();
-              router.push('/compose?mode=text');
-            }}
-            style={({ pressed }) => [
-              raisedSurface(colors, 14),
-              styles.newButton,
-              {
-                transform: [{ scale: pressed ? 0.94 : 1 }],
-                opacity: pressed ? 0.8 : 1,
-              },
-            ]}
-            accessibilityRole="button"
-            accessibilityLabel={t('pages.writePage')}
-          >
-            <Ionicons name="create-outline" size={20} color={colors.ink} accessible={false} importantForAccessibility="no" />
-          </Pressable>
+          <View style={styles.headerActions}>
+            <Pressable
+              onPress={() => {
+                void hapticLight();
+                setPromptOpen(true);
+              }}
+              style={({ pressed }) => [
+                raisedSurface(colors, 14),
+                styles.newButton,
+                {
+                  transform: [{ scale: pressed ? 0.94 : 1 }],
+                  opacity: pressed ? 0.8 : 1,
+                },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={t('pages.promptsA11y')}
+            >
+              <Ionicons name="chatbubble-ellipses-outline" size={20} color={colors.ink} accessible={false} importantForAccessibility="no" />
+            </Pressable>
+            <Pressable
+              onPress={() => {
+                void hapticLight();
+                router.push('/compose?mode=text');
+              }}
+              style={({ pressed }) => [
+                raisedSurface(colors, 14),
+                styles.newButton,
+                {
+                  transform: [{ scale: pressed ? 0.94 : 1 }],
+                  opacity: pressed ? 0.8 : 1,
+                },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={t('pages.writePage')}
+            >
+              <Ionicons name="create-outline" size={20} color={colors.ink} accessible={false} importantForAccessibility="no" />
+            </Pressable>
+          </View>
         </View>
 
         <HubSegmentControl options={viewOptions} value={viewMode} onChange={setViewMode} />
@@ -228,6 +253,14 @@ export function JournalScreen() {
           </>
         )}
       </ScrollView>
+      <PromptLibrarySheet
+        visible={promptOpen}
+        onClose={() => setPromptOpen(false)}
+        onPick={(prompt) => {
+          router.push(`/compose?mode=text&prompt=${encodeURIComponent(prompt)}`);
+        }}
+      />
+      <HubCaptureFab />
     </ScreenScaffold>
   );
 }
@@ -252,6 +285,11 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
     marginBottom: 2,
     fontFamily: fonts.bodySemi,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   newButton: {
     width: 44,

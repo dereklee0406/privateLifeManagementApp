@@ -1,72 +1,107 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFinance } from '../../controller/FinanceProvider';
 import { useJournal } from '../../controller/JournalProvider';
 import { useReminders } from '../../controller/ReminderProvider';
 import { useSettings } from '../../controller/SettingsProvider';
-import {
-  formatMoney,
-  resolveExpenseCategories,
-  type ExpenseCategory,
-} from '../../model/finance/Expense';
-import { budgetProgressFor, monthSpendTotal } from '../../model/finance/financeStats';
-import { computeMonthSpendInsight } from '../../model/finance/monthInsights';
-import { computeNetWorth } from '../../model/finance/netWorth';
-import { resolveShowAdvancedFinance } from '../../model/settings/AppSettings';
-import { computeLifeAreas } from '../../model/journal/lifeAreas';
-import { getMoodDefinition, normalizeMoodId, type MoodId } from '../../model/journal/Mood';
-import {
-  calculateHabitStreak,
-  computeOverallHabitRhythm,
-} from '../../model/reminders/habitStreaks';
-import { toDayKey } from '../../utils/dateUtils';
+import { computeMonthlyBoardFacts, computeWeeklyBoardFacts } from '../../model/insights/boardFacts';
+import { computeMonthlyInsightsReport } from '../../model/insights/monthlyReport';
+import { buildMonthlyShareFacts } from '../../model/insights/monthlyShare';
+import type { InsightsPressure } from '../../model/insights/pressure';
+import { pickTodayPrediction } from '../../model/insights/predictions';
+import { computeWeeklyInsightsReport } from '../../model/insights/weeklyReport';
+import { computeSeasonRank } from '../../model/season/seasonRank';
+import { resolveWeekStart } from '../../model/settings/AppSettings';
+import { nextUpCard } from '../../model/today/nextUp';
 import { appHref } from '../../utils/navigation';
 import { hapticLight } from '../../utils/haptics';
-import { GlassSurface } from '../components/GlassSurface';
+import { HubCaptureFab } from '../components/HubCaptureFab';
 import { HubSegmentControl, type HubSegmentOption } from '../components/HubSegmentControl';
+import { InsightsGlanceGrid } from '../components/InsightsGlanceGrid';
+import { InsightsSeasonHero } from '../components/InsightsSeasonHero';
+import { InsightsTakeaway } from '../components/InsightsTakeaway';
+import { InsightsMonthPace, InsightsWeekStrip } from '../components/InsightsWeekStrip';
 import { LargeTitle } from '../components/LargeTitle';
-import { MoodTrendCharts } from '../components/MoodTrendCharts';
+import { MonthlyReportShareButton } from '../components/MonthlyReportShareButton';
 import { ScreenScaffold } from '../components/ScreenScaffold';
-import { TypeIcon } from '../components/TypeIcon';
-import { expenseCategoryLabel, iconForExpenseCategory } from '../icons/typeIcons';
-import { useI18n } from '../i18n';
+import { TodayPredictionLine } from '../components/TodayPredictionLine';
+import { localizeMonthlyInsights, localizeWeeklyInsights, useI18n } from '../i18n';
 import { useThemeColors } from '../theme/ThemeProvider';
 import { fonts, raisedSurface } from '../theme/tokens';
 import { tabScenePaddingBottom, type } from '../theme/typography';
 
-export type InsightsSegment = 'reflection' | 'habits' | 'finance';
-
-/** Soft climate labels for the four MoodId buckets (Home check-in vocabulary). */
-const MOOD_CLIMATE_LABEL: Record<MoodId, 'home.moodRadiant' | 'home.moodCalm' | 'home.moodFoggy' | 'home.moodLow'> = {
-  happy: 'home.moodRadiant',
-  neutral: 'home.moodCalm',
-  sad: 'home.moodFoggy',
-  angry: 'home.moodLow',
-};
+export type InsightsSegment = 'week' | 'month';
 
 /**
- * Purpose: Tab 5 Insights hub — reflection, habit consistency, and money pulse analytics.
- * Inputs: journal / reminders / finance providers; optional none (always lands on Reflection).
- * Outputs: editorial header + settings CTA + HubSegmentControl + active segment panels.
- * Side effects: navigation to `/settings`; segment haptic via HubSegmentControl.
- * Design decisions: thin View orchestration; domain math stays in model helpers. Settings is a
- *   stack push so swipe-back works; Settings is no longer a primary tab.
+ * Purpose: parse Insights deep-link `segment` (Today Season mark → This month).
+ * Inputs: raw query.
+ * Outputs: week | month | null.
+ * Side effects: none.
+ */
+function parseInsightsSegment(raw: string | string[] | undefined): InsightsSegment | null {
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  if (value === 'week' || value === 'month') {
+    return value;
+  }
+  return null;
+}
+
+/**
+ * Purpose: deep-link path for a pressure kind (synthesis, not a reprinted list).
+ * Inputs: pressure id.
+ * Outputs: in-app href.
+ * Side effects: none.
+ */
+function hrefForPressure(pressure: InsightsPressure): string {
+  if (pressure === 'overdue') {
+    return '/(tabs)/calendar?tab=tasks';
+  }
+  if (pressure === 'habits') {
+    return '/(tabs)/calendar?tab=streaks';
+  }
+  if (pressure === 'budget' || pressure === 'spendUp') {
+    return '/(tabs)/money?segment=cashflow';
+  }
+  if (pressure === 'worth') {
+    return '/(tabs)/money?segment=worth';
+  }
+  if (pressure === 'writing' || pressure === 'quiet') {
+    return '/(tabs)/journal';
+  }
+  return '/(tabs)';
+}
+
+/**
+ * Purpose: Tab 5 Insights — This week | This month board pack + deep links.
+ * Inputs: journal / reminders / finance / settings; optional `segment` query.
+ * Outputs: header, settings cog, two segments, Season hero, glance tiles, takeaway, share (month).
+ * Side effects: navigates to Settings or hub deep links; segment haptic via HubSegmentControl.
+ * Design decisions: math stays in Model. One visual hero, then tiles, then texture, then the
+ *   take. No reprint of Rhythm streak lists or Wallet category rows. Close-the-day is skipped
+ *   so Today stays a 30s loop. HubCaptureFab stays.
  */
 export function InsightsScreen() {
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { t } = useI18n();
-  const [segment, setSegment] = useState<InsightsSegment>('reflection');
+  const params = useLocalSearchParams<{ segment?: string | string[] }>();
+  const [segment, setSegment] = useState<InsightsSegment>(() => parseInsightsSegment(params.segment) ?? 'week');
+
+  useEffect(() => {
+    const next = parseInsightsSegment(params.segment);
+    if (next) {
+      setSegment(next);
+    }
+  }, [params.segment]);
 
   const segmentOptions = useMemo<HubSegmentOption<InsightsSegment>[]>(
     () => [
-      { id: 'reflection', label: t('insights.tabReflection'), icon: 'leaf-outline' },
-      { id: 'habits', label: t('insights.tabHabits'), icon: 'flame-outline' },
-      { id: 'finance', label: t('insights.tabFinance'), icon: 'wallet-outline' },
+      { id: 'week', label: t('insights.tabWeek'), icon: 'calendar-outline' },
+      { id: 'month', label: t('insights.tabMonth'), icon: 'stats-chart-outline' },
     ],
     [t],
   );
@@ -83,9 +118,11 @@ export function InsightsScreen() {
       >
         <View style={styles.topRow}>
           <View style={styles.titleBlock}>
-            <Text style={[type.footnote, styles.headerKicker, { color: colors.accent }]}>
-              {t('insights.headerKicker')}
-            </Text>
+            {t('insights.headerKicker') ? (
+              <Text style={[type.footnote, styles.headerKicker, { color: colors.accent }]}>
+                {t('insights.headerKicker')}
+              </Text>
+            ) : null}
             <LargeTitle title={t('insights.headerTitle')} />
           </View>
           <Pressable
@@ -116,337 +153,201 @@ export function InsightsScreen() {
 
         <HubSegmentControl options={segmentOptions} value={segment} onChange={setSegment} />
 
-        {segment === 'reflection' ? <ReflectionPanel /> : null}
-        {segment === 'habits' ? <HabitsPanel /> : null}
-        {segment === 'finance' ? <FinancePanel /> : null}
+        {segment === 'week' ? <WeekPanel /> : <MonthPanel />}
       </ScrollView>
+      <HubCaptureFab />
     </ScreenScaffold>
   );
 }
 
 /**
- * Purpose: Reflection & Mood segment — writing rhythm, 30-day climate, life areas.
- * Inputs: JournalProvider insights / moodAnalysis / entries.
+ * Purpose: This week board pack — Season hero, glance tiles, week strip, takeaway, prediction echo.
+ * Inputs: providers; weekly report + board facts + Season in Model.
  * Outputs: presentation only.
- * Side effects: none.
+ * Side effects: deep-link navigation from child tiles.
  */
-function ReflectionPanel() {
+function WeekPanel() {
   const colors = useThemeColors();
   const { t } = useI18n();
-  const { insights, moodAnalysis, entries } = useJournal();
-  const maxMood = Math.max(1, ...insights.moodShares.map((share) => share.count));
-  const lifeAreas = useMemo(() => computeLifeAreas(entries), [entries]);
-
-  return (
-    <View style={styles.panelStack}>
-      <Text style={[type.subhead, { color: colors.muted }]}>{t('you.insightsLede')}</Text>
-
-      <View style={styles.row}>
-        <GlassSurface style={styles.stat} radius={24}>
-          <Text style={[styles.statValue, { color: colors.ink }]}>{insights.wordCount}</Text>
-          <Text style={[styles.statLabel, { color: colors.muted }]}>{t('you.wordsKept')}</Text>
-        </GlassSurface>
-        <GlassSurface style={styles.stat} radius={24}>
-          <Text style={[styles.statValue, { color: colors.accent }]}>{insights.writingDaysThisWeek}</Text>
-          <Text style={[styles.statLabel, { color: colors.muted }]}>{t('you.daysThisWeek')}</Text>
-        </GlassSurface>
-      </View>
-
-      <GlassSurface style={styles.panel} radius={28}>
-        <Text style={[styles.panelTitle, { color: colors.ink }]}>{t('you.moodClimate')}</Text>
-        {insights.moodShares.length === 0 ? (
-          <Text style={[styles.empty, { color: colors.muted }]}>{t('you.noPagesClimate')}</Text>
-        ) : (
-          insights.moodShares.map((share) => {
-            const moodId = normalizeMoodId(share.mood);
-            const mood = getMoodDefinition(moodId);
-            const width = `${Math.max(12, (share.count / maxMood) * 100)}%` as `${number}%`;
-            return (
-              <View key={share.mood} style={styles.moodRow}>
-                <Text style={styles.moodEmoji}>{mood.emoji}</Text>
-                <Text style={[styles.moodLabel, { color: colors.muted }]}>
-                  {t(MOOD_CLIMATE_LABEL[moodId])}
-                </Text>
-                <View style={[styles.track, { backgroundColor: colors.well }]}>
-                  <View style={[styles.fill, { width, backgroundColor: colors.mood[moodId] }]} />
-                </View>
-                <Text style={[styles.count, { color: colors.faint }]}>{share.count}</Text>
-              </View>
-            );
-          })
-        )}
-      </GlassSurface>
-
-      <MoodTrendCharts
-        last30Days={moodAnalysis.last30Days}
-        daily={moodAnalysis.daily}
-        weekly={moodAnalysis.weekly}
-        monthly={moodAnalysis.monthly}
-      />
-
-      {lifeAreas.length > 0 ? (
-        <GlassSurface style={styles.panel} radius={28}>
-          <Text style={[styles.panelTitle, { color: colors.ink }]}>{t('you.lifeAreas')}</Text>
-          {lifeAreas.map((area) => {
-            const width = `${Math.max(8, area.percent)}%` as `${number}%`;
-            const areaKey = `types.${area.id}`;
-            const areaLabel = t(areaKey);
-            return (
-              <View key={area.id} style={styles.moodRow}>
-                <Text style={[styles.moodLabel, { color: colors.muted, width: 72 }]} numberOfLines={2}>
-                  {areaLabel !== areaKey ? areaLabel : area.label}
-                </Text>
-                <View style={[styles.track, { backgroundColor: colors.well }]}>
-                  <View style={[styles.fill, { width, backgroundColor: colors.accent }]} />
-                </View>
-                <Text style={[styles.count, { color: colors.faint, width: 36 }]}>{area.percent}%</Text>
-              </View>
-            );
-          })}
-        </GlassSurface>
-      ) : null}
-    </View>
-  );
-}
-
-/**
- * Purpose: Habits & Consistency segment — active habits, streak records, 30/90-day rhythm.
- * Inputs: ReminderProvider recurring habits.
- * Outputs: presentation only; streak math in habitStreaks model.
- * Side effects: none.
- */
-function HabitsPanel() {
-  const colors = useThemeColors();
-  const { t } = useI18n();
-  const { reminders } = useReminders();
-  const todayKey = toDayKey(new Date());
-
-  const habits = useMemo(
-    () => reminders.filter((row) => row.enabled && row.recurrence.type !== 'once'),
-    [reminders],
-  );
-
-  const overall = useMemo(
-    () => computeOverallHabitRhythm(habits, todayKey),
-    [habits, todayKey],
-  );
-
-  const streakRows = useMemo(
-    () =>
-      habits
-        .map((habit) => ({ habit, streak: calculateHabitStreak(habit, todayKey) }))
-        .sort((left, right) => right.streak.bestStreak - left.streak.bestStreak)
-        .slice(0, 5),
-    [habits, todayKey],
-  );
-
-  const bestEver = streakRows.reduce((max, row) => Math.max(max, row.streak.bestStreak), 0);
-
-  if (habits.length === 0) {
-    return (
-      <GlassSurface style={styles.panel} radius={28}>
-        <Text style={[styles.panelTitle, { color: colors.ink }]}>{t('habits.streaksTitle')}</Text>
-        <Text style={[styles.empty, { color: colors.muted }]}>{t('habits.emptyStateHint')}</Text>
-      </GlassSurface>
-    );
-  }
-
-  return (
-    <View style={styles.panelStack}>
-      <View style={styles.row}>
-        <GlassSurface style={styles.stat} radius={24}>
-          <Text style={[styles.statValue, { color: colors.accent }]}>
-            {`${Math.round(overall.overallConsistency30Days * 100)}%`}
-          </Text>
-          <Text style={[styles.statLabel, { color: colors.muted }]}>{t('habits.overallRhythm')}</Text>
-        </GlassSurface>
-        <GlassSurface style={styles.stat} radius={24}>
-          <Text style={[styles.statValue, { color: colors.ink }]}>{overall.activeHabitCount}</Text>
-          <Text style={[styles.statLabel, { color: colors.muted }]}>
-            {t('habits.activeHabitsCount', { count: overall.activeHabitCount })}
-          </Text>
-        </GlassSurface>
-      </View>
-
-      <GlassSurface style={styles.panel} radius={28}>
-        <Text style={[styles.panelTitle, { color: colors.ink }]}>{t('habits.rhythmMatrix')}</Text>
-        <View style={styles.metricRow}>
-          <Text style={[styles.statLabel, { color: colors.muted }]}>{t('habits.currentStreak')}</Text>
-          <Text style={[styles.metricValue, { color: colors.accent }]}>
-            {t('habits.streakDays', { days: overall.bestCurrentStreak })}
-          </Text>
-        </View>
-        <View style={styles.metricRow}>
-          <Text style={[styles.statLabel, { color: colors.muted }]}>{t('habits.bestStreak', { days: bestEver })}</Text>
-          <Text style={[styles.metricValue, { color: colors.ink }]}>
-            {`${overall.todayCompletedCount}/${overall.activeHabitCount}`}
-          </Text>
-        </View>
-      </GlassSurface>
-
-      <GlassSurface style={styles.panel} radius={28}>
-        <Text style={[styles.panelTitle, { color: colors.ink }]}>{t('habits.streaksTitle')}</Text>
-        {streakRows.map(({ habit, streak }) => (
-          <View key={habit.id} style={styles.habitRow}>
-            <View style={styles.habitCopy}>
-              <Text style={[styles.habitTitle, { color: colors.ink }]} numberOfLines={1}>
-                {habit.title}
-              </Text>
-              <Text style={[styles.statLabel, { color: colors.muted }]}>
-                {`🔥 ${t('habits.streakDays', { days: streak.currentStreak })} · ${t('habits.bestStreak', { days: streak.bestStreak })}`}
-              </Text>
-            </View>
-            <Text style={[styles.countWide, { color: colors.accent }]}>
-              {`${Math.round(streak.consistencyRate30Days * 100)}%`}
-            </Text>
-          </View>
-        ))}
-      </GlassSurface>
-    </View>
-  );
-}
-
-/**
- * Purpose: Financial Pulse segment — net worth (optional), month spend vs budgets, top categories.
- * Inputs: FinanceProvider + Settings advanced-finance flag.
- * Outputs: presentation only.
- * Side effects: none.
- */
-function FinancePanel() {
-  const colors = useThemeColors();
-  const { t } = useI18n();
+  const { entries } = useJournal();
+  const { reminders, creditCards } = useReminders();
+  const { expenses, budgets, recurringSpends } = useFinance();
   const { settings } = useSettings();
-  const { expenses, budgets, assets, loans } = useFinance();
-  const { creditCards } = useReminders();
-  const now = useMemo(() => new Date(), []);
-  const currency = settings.defaultCurrency;
-  const extrasOn = resolveShowAdvancedFinance(settings, assets.length > 0 || loans.length > 0);
-  const expenseCatalog = useMemo(() => resolveExpenseCategories(settings), [settings]);
-
-  const net = useMemo(
-    () => computeNetWorth(assets, loans, creditCards, currency),
-    [assets, loans, creditCards, currency],
+  const now = useMemo(
+    () => new Date(),
+    [entries.length, reminders.length, expenses.length, budgets.length, recurringSpends.length],
   );
-
-  const insight = useMemo(
-    () => computeMonthSpendInsight(expenses, currency, now),
-    [expenses, currency, now],
+  const weekStartsOn = resolveWeekStart(settings);
+  const report = useMemo(
+    () =>
+      computeWeeklyInsightsReport(
+        entries,
+        expenses,
+        reminders,
+        budgets,
+        settings.defaultCurrency,
+        now,
+        creditCards,
+        weekStartsOn,
+      ),
+    [entries, expenses, reminders, budgets, settings.defaultCurrency, now, creditCards, weekStartsOn],
   );
-
-  const budgetRows = useMemo(
-    () => budgetProgressFor(budgets, expenses, now.getFullYear(), now.getMonth(), currency),
-    [budgets, expenses, now, currency],
+  const board = useMemo(
+    () => computeWeeklyBoardFacts(report, entries, expenses, reminders, now, weekStartsOn),
+    [report, entries, expenses, reminders, now, weekStartsOn],
   );
-  const overCount = budgetRows.filter((row) => row.over).length;
-  const budgetAlert =
-    overCount === 0
-      ? t('alerts.budgetsFine')
-      : overCount === 1
-        ? t('alerts.budgetOverOne')
-        : t('alerts.budgetsOver', { count: overCount });
-
-  const topCategories = useMemo(() => {
-    const year = now.getFullYear();
-    const month = now.getMonth();
-    const seen = new Set<ExpenseCategory>();
-    const prefix = `${year}-${String(month + 1).padStart(2, '0')}`;
-    for (const item of expenses) {
-      if (item.dayKey.startsWith(prefix)) {
-        seen.add(item.category);
-      }
-    }
-    return [...seen]
-      .map((category) => ({
-        category,
-        amount: monthSpendTotal(expenses, year, month, currency, category),
-      }))
-      .filter((row) => row.amount > 0)
-      .sort((left, right) => right.amount - left.amount)
-      .slice(0, 5);
-  }, [expenses, now, currency]);
-
-  const maxCategory = Math.max(1, ...topCategories.map((row) => row.amount));
+  const copy = useMemo(() => localizeWeeklyInsights(t, report), [t, report]);
+  const season = useSeason(now);
+  const next = useMemo(
+    () => nextUpCard(reminders, creditCards, settings.defaultCurrency, now),
+    [reminders, creditCards, settings.defaultCurrency, now],
+  );
+  const prediction = useMemo(
+    () =>
+      pickTodayPrediction({
+        reminders,
+        creditCards,
+        recurringSpends,
+        expenses,
+        budgets,
+        journalDaysWrittenThisWeek: report.daysWritten,
+        currency: settings.defaultCurrency,
+        now,
+        nextUp: next,
+      }),
+    [reminders, creditCards, recurringSpends, expenses, budgets, report.daysWritten, settings.defaultCurrency, now, next],
+  );
 
   return (
     <View style={styles.panelStack}>
-      {extrasOn ? (
-        <GlassSurface style={styles.panel} radius={28}>
-          <Text style={[styles.panelTitle, { color: colors.ink }]}>{t('you.netAssetLabel')}</Text>
-          <Text style={[styles.statValue, { color: colors.accent }]}>
-            {formatMoney(net.net, currency)}
-          </Text>
-          <Text style={[styles.empty, { color: colors.muted }]}>{budgetAlert}</Text>
-        </GlassSurface>
+      <Text style={[type.subhead, styles.lede, { color: colors.muted }]}>{t('insights.weekLede')}</Text>
+      <InsightsSeasonHero season={season} />
+      {prediction ? <TodayPredictionLine prediction={prediction} /> : null}
+      <InsightsGlanceGrid tiles={board.tiles} />
+      <InsightsWeekStrip cells={board.strip} />
+      {board.sparse ? (
+        <SparseInvites
+          note={t('insights.emptyWeek')}
+          showWorth={false}
+        />
       ) : null}
+      <InsightsTakeaway line={copy.pressureLine} href={hrefForPressure(report.pressure)} />
+    </View>
+  );
+}
 
-      <GlassSurface style={styles.panel} radius={28}>
-        <Text style={[styles.panelTitle, { color: colors.ink }]}>{t('money.spentThisMonth')}</Text>
-        <Text style={[styles.statValue, { color: colors.ink }]}>
-          {formatMoney(insight.spent, currency)}
-        </Text>
-        {insight.changeLine ? (
-          <Text style={[styles.empty, { color: colors.muted }]}>{insight.changeLine}</Text>
-        ) : null}
-        {budgetRows.length > 0 ? (
-          <Text style={[styles.empty, { color: colors.muted }]}>{budgetAlert}</Text>
-        ) : null}
-      </GlassSurface>
+/**
+ * Purpose: This month board pack — Season hero, glance tiles, pace, takeaway, share card.
+ * Inputs: providers; monthly report + board facts + Season in Model.
+ * Outputs: presentation only.
+ * Side effects: deep-link navigation from child tiles; share via MonthlyReportShareButton.
+ */
+function MonthPanel() {
+  const colors = useThemeColors();
+  const { t } = useI18n();
+  const { entries } = useJournal();
+  const { reminders } = useReminders();
+  const { expenses, budgets, netWorthHistory } = useFinance();
+  const { settings } = useSettings();
+  const now = useMemo(
+    () => new Date(),
+    [entries.length, reminders.length, expenses.length, budgets.length, netWorthHistory.length],
+  );
+  const report = useMemo(
+    () =>
+      computeMonthlyInsightsReport(
+        entries,
+        expenses,
+        reminders,
+        budgets,
+        netWorthHistory,
+        settings.defaultCurrency,
+        now,
+      ),
+    [entries, expenses, reminders, budgets, netWorthHistory, settings.defaultCurrency, now],
+  );
+  const board = useMemo(
+    () => computeMonthlyBoardFacts(report, entries, reminders, now),
+    [report, entries, reminders, now],
+  );
+  const copy = useMemo(() => localizeMonthlyInsights(t, report), [t, report]);
+  const season = useSeason(now);
+  const shareFacts = useMemo(
+    () => buildMonthlyShareFacts(report, season.rank, now),
+    [report, season.rank, now],
+  );
 
-      {budgetRows.length > 0 ? (
-        <GlassSurface style={styles.panel} radius={28}>
-          <Text style={[styles.panelTitle, { color: colors.ink }]}>{t('money.budgets')}</Text>
-          {budgetRows.slice(0, 5).map((row) => {
-            const limit = Math.max(1, row.budget.limit);
-            const width = `${Math.min(100, Math.max(8, (row.spent / limit) * 100))}%` as `${number}%`;
-            return (
-              <View key={row.budget.id} style={styles.moodRow}>
-                <TypeIcon
-                  typeId={row.budget.category}
-                  icon={iconForExpenseCategory(row.budget.category, expenseCatalog)}
-                  accessibilityLabel={expenseCategoryLabel(t, row.budget.category, expenseCatalog)}
-                />
-                <View style={[styles.track, { backgroundColor: colors.well }]}>
-                  <View
-                    style={[
-                      styles.fill,
-                      { width, backgroundColor: row.over ? colors.danger : colors.accent },
-                    ]}
-                  />
-                </View>
-                <Text style={[styles.countWide, { color: colors.faint }]}>
-                  {formatMoney(row.spent, currency)}
-                </Text>
-              </View>
-            );
-          })}
-        </GlassSurface>
-      ) : null}
+  return (
+    <View style={styles.panelStack}>
+      <Text style={[type.subhead, styles.lede, { color: colors.muted }]}>{t('insights.monthLede')}</Text>
+      <InsightsSeasonHero season={season} hint />
+      <InsightsGlanceGrid tiles={board.tiles} />
+      <InsightsMonthPace pace={board.pace} />
+      {board.sparse ? <SparseInvites note={t('insights.emptyMonth')} showWorth /> : null}
+      <InsightsTakeaway line={copy.pressureLine} href={hrefForPressure(report.pressure)} />
+      <MonthlyReportShareButton facts={shareFacts} />
+    </View>
+  );
+}
 
-      <GlassSurface style={styles.panel} radius={28}>
-        <Text style={[styles.panelTitle, { color: colors.ink }]}>{t('money.categories')}</Text>
-        {topCategories.length === 0 ? (
-          <Text style={[styles.empty, { color: colors.muted }]}>{t('money.emptyMonth')}</Text>
-        ) : (
-          topCategories.map((row) => {
-            const width = `${Math.max(12, (row.amount / maxCategory) * 100)}%` as `${number}%`;
-            return (
-              <View key={row.category} style={styles.moodRow}>
-                <TypeIcon
-                  typeId={row.category}
-                  icon={iconForExpenseCategory(row.category, expenseCatalog)}
-                  accessibilityLabel={expenseCategoryLabel(t, row.category, expenseCatalog)}
-                />
-                <View style={[styles.track, { backgroundColor: colors.well }]}>
-                  <View style={[styles.fill, { width, backgroundColor: colors.accent }]} />
-                </View>
-                <Text style={[styles.countWide, { color: colors.faint }]}>
-                  {formatMoney(row.amount, currency)}
-                </Text>
-              </View>
-            );
-          })
-        )}
-      </GlassSurface>
+/**
+ * Purpose: derive Season for Insights hero (same Model as Today).
+ * Inputs: now (caller-frozen).
+ * Outputs: SeasonRank.
+ * Side effects: none.
+ */
+function useSeason(now: Date) {
+  const { entries } = useJournal();
+  const { reminders } = useReminders();
+  const { expenses, budgets } = useFinance();
+  const { settings } = useSettings();
+  return useMemo(
+    () => computeSeasonRank(entries, reminders, budgets, expenses, settings.defaultCurrency, now),
+    [entries, reminders, budgets, expenses, settings.defaultCurrency, now],
+  );
+}
+
+/**
+ * Purpose: designed first-week / first-month invites — Write / Habit / Spend (Worth on month).
+ * Inputs: empty-board note; whether to include Worth.
+ * Outputs: short note + 44pt pills into existing hubs.
+ * Side effects: navigation.
+ * Design decisions: not a blank scoreboard. Routes match glance tiles. No sixth tab.
+ */
+function SparseInvites({ note, showWorth }: { note: string; showWorth: boolean }) {
+  const colors = useThemeColors();
+  const router = useRouter();
+  const { t } = useI18n();
+  const pills = [
+    { label: t('insights.inviteWrite'), href: '/(tabs)/journal' },
+    { label: t('insights.inviteHabit'), href: '/(tabs)/calendar?tab=streaks' },
+    { label: t('insights.inviteSpend'), href: '/(tabs)/money?segment=cashflow' },
+    ...(showWorth ? [{ label: t('insights.inviteWorth'), href: '/(tabs)/money?segment=worth' }] : []),
+  ];
+
+  return (
+    <View style={styles.sparse}>
+      <Text style={[styles.sparseNote, { color: colors.ink }]}>{note}</Text>
+      <View style={styles.pills}>
+        {pills.map((pill) => (
+          <Pressable
+            key={pill.href + pill.label}
+            onPress={() => {
+              void hapticLight();
+              router.push(appHref(pill.href));
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={pill.label}
+            style={({ pressed }) => [
+              raisedSurface(colors, 18),
+              styles.pill,
+              { opacity: pressed ? 0.8 : 1, transform: [{ scale: pressed ? 0.97 : 1 }] },
+            ]}
+          >
+            <Text style={[styles.pillLabel, { color: colors.ink }]}>{pill.label}</Text>
+          </Pressable>
+        ))}
+      </View>
     </View>
   );
 }
@@ -479,102 +380,32 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   panelStack: {
-    gap: 14,
-  },
-  row: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  stat: {
-    flex: 1,
-    padding: 18,
-  },
-  statValue: {
-    fontFamily: fonts.display,
-    fontSize: 32,
-    fontVariant: ['tabular-nums'],
-  },
-  statLabel: {
-    fontFamily: fonts.body,
-    fontSize: 13,
-    marginTop: 4,
-  },
-  panel: {
-    padding: 20,
     gap: 16,
   },
-  panelTitle: {
-    fontFamily: fonts.display,
-    fontSize: 22,
+  lede: {
+    marginBottom: -4,
   },
-  empty: {
+  sparse: {
+    gap: 12,
+  },
+  sparseNote: {
     fontFamily: fonts.body,
-    fontSize: 15,
+    fontSize: 16,
     lineHeight: 22,
   },
-  moodRow: {
+  pills: {
     flexDirection: 'row',
-    alignItems: 'center',
+    flexWrap: 'wrap',
     gap: 10,
   },
-  moodEmoji: {
-    fontSize: 16,
-    width: 24,
+  pill: {
+    minHeight: 44,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    justifyContent: 'center',
   },
-  moodLabel: {
-    fontFamily: fonts.bodyMedium,
-    fontSize: 13,
-    width: 64,
-    minWidth: 0,
-    flexShrink: 1,
-  },
-  track: {
-    flex: 1,
-    height: 10,
-    borderRadius: 999,
-    overflow: 'hidden',
-  },
-  fill: {
-    height: 10,
-    borderRadius: 999,
-  },
-  count: {
-    fontFamily: fonts.body,
-    fontSize: 12,
-    width: 18,
-    textAlign: 'right',
-    fontVariant: ['tabular-nums'],
-  },
-  countWide: {
-    fontFamily: fonts.body,
-    fontSize: 12,
-    minWidth: 56,
-    textAlign: 'right',
-    fontVariant: ['tabular-nums'],
-  },
-  metricRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  metricValue: {
+  pillLabel: {
     fontFamily: fonts.bodySemi,
-    fontSize: 16,
-    fontVariant: ['tabular-nums'],
-  },
-  habitRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  habitCopy: {
-    flex: 1,
-    minWidth: 0,
-    gap: 2,
-  },
-  habitTitle: {
-    fontFamily: fonts.bodySemi,
-    fontSize: 16,
+    fontSize: 15,
   },
 });

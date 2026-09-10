@@ -38,6 +38,7 @@ import { Chip } from '../components/Chip';
 import { EmptyState } from '../components/EmptyState';
 import { DateField } from '../components/DateField';
 import { GlassSurface } from '../components/GlassSurface';
+import { HubCaptureFab } from '../components/HubCaptureFab';
 import { HubSegmentControl, type HubSegmentOption } from '../components/HubSegmentControl';
 import { QuickSpendSheet } from '../components/QuickSpendSheet';
 import { ScreenScaffold } from '../components/ScreenScaffold';
@@ -53,8 +54,9 @@ import { tabScenePaddingBottom, type } from '../theme/typography';
 import { useI18n, type Translate } from '../i18n';
 import { PaymentCardsScreen } from './PaymentCardsScreen';
 import { SubscriptionsCockpitScreen } from './SubscriptionsCockpitScreen';
+import { WalletWorthPanel } from './WalletWorthPanel';
 
-type MoneyHubSegment = 'cashflow' | 'subscriptions' | 'cards';
+type MoneyHubSegment = 'cashflow' | 'subscriptions' | 'cards' | 'worth';
 type MoneyFocus = 'all' | 'income' | 'expenses' | 'transfers' | 'budgets';
 
 /**
@@ -65,7 +67,7 @@ type MoneyFocus = 'all' | 'income' | 'expenses' | 'transfers' | 'budgets';
  */
 function parseMoneySegment(raw: string | string[] | undefined): MoneyHubSegment | null {
   const value = Array.isArray(raw) ? raw[0] : raw;
-  if (value === 'cashflow' || value === 'subscriptions' || value === 'cards') {
+  if (value === 'cashflow' || value === 'subscriptions' || value === 'cards' || value === 'worth') {
     return value;
   }
   return null;
@@ -153,14 +155,13 @@ function spendFxEstimateLine(item: Expense): string | undefined {
 }
 
 /**
- * Purpose: Money tab — 3-segment financial hub (Cashflow / Subscriptions / Cards & Rewards).
+ * Purpose: Wallet tab — 4-segment financial hub (Cashflow / Recurring / Cards / Worth).
  * Inputs: finance, reminders, settings; optional `segment` search param for deep links.
  * Outputs: editorial header + neumorphic segment control; Cashflow canvas or embedded
- *   Subscriptions / Payment Cards panels while the floating tab bar stays visible.
+ *   Subscriptions / Payment Cards / Worth panels while the floating tab bar stays visible.
  * Side effects: inline budget saves; navigation to composers; QuickSpend sheet.
- * Design decisions: subscriptions & cards live as hub segments (no stack push that hides the
- *   tab bar). Standalone `/subscriptions` and `/payment-cards` routes keep working for
- *   external links. Cashflow focus chips drop the old Cards filter (cards have their own tab).
+ * Design decisions: Worth is always a visible segment (empty state invites the first asset).
+ *   showAdvancedFinance still gates Cashflow extras only. Subscriptions & cards stay in-tab.
  */
 export function MoneyScreen() {
   const { t, intlLocale } = useI18n();
@@ -213,6 +214,7 @@ export function MoneyScreen() {
       { id: 'cashflow', label: t('money.tabCashflow'), icon: 'wallet-outline' },
       { id: 'subscriptions', label: t('money.tabSubscriptions'), icon: 'repeat-outline' },
       { id: 'cards', label: t('money.tabCards'), icon: 'card-outline' },
+      { id: 'worth', label: t('worth.tab'), icon: 'stats-chart-outline' },
     ],
     [t],
   );
@@ -260,9 +262,11 @@ export function MoneyScreen() {
       <View style={[styles.chrome, { paddingTop: insets.top + 8 }]}>
         <View style={styles.topRow}>
           <View style={styles.titleBlock}>
-            <Text style={[type.footnote, styles.headerKicker, { color: colors.accent }]}>
-              {t('money.headerKicker')}
-            </Text>
+            {t('money.headerKicker') ? (
+              <Text style={[type.footnote, styles.headerKicker, { color: colors.accent }]}>
+                {t('money.headerKicker')}
+              </Text>
+            ) : null}
             <LargeTitle title={t('money.headerTitle')} />
           </View>
           <Pressable
@@ -616,7 +620,6 @@ export function MoneyScreen() {
                 ) : null}
               </GlassSurface>
               <SpendTrendBars rows={trend} />
-              <Text style={[styles.meta, { color: colors.faint }]}>{t('money.netWorthComingLater')}</Text>
             </>
           ) : (
             <SectionActionButton
@@ -632,8 +635,10 @@ export function MoneyScreen() {
 
       {hub === 'subscriptions' ? <SubscriptionsCockpitScreen embedded /> : null}
       {hub === 'cards' ? <PaymentCardsScreen embedded /> : null}
+      {hub === 'worth' ? <WalletWorthPanel /> : null}
 
       <QuickSpendSheet visible={quickSpendOpen} onClose={() => setQuickSpendOpen(false)} />
+      <HubCaptureFab />
     </ScreenScaffold>
   );
 }

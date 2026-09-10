@@ -1,14 +1,16 @@
 import type { FinanceDocument } from '../finance/Account';
+import type { Goal } from '../goals/Goal';
 import type { JournalEntry } from '../journal/JournalEntry';
 import type { ReminderDocument } from '../reminders/normalizeReminder';
 import type { AppSettings } from '../settings/AppSettings';
 
 /**
  * Purpose: versioned inner snapshot of on-device life + money (never the lock PIN).
- * Inputs: assembled by serializeBackup from the four local stores.
+ * Inputs: assembled by serializeBackup from the local stores.
  * Outputs: JSON-serializable document encrypted before it is written to a file.
  * Side effects: none.
  * Design decisions: version 1 is a replace-all restore; media stays as URIs, not inlined bytes; PIN/secret never appear here.
+ *   `goals` is required on new exports; older v1 files without it parse as [].
  */
 export interface BackupDocument {
   version: 1;
@@ -17,6 +19,7 @@ export interface BackupDocument {
   reminders: ReminderDocument;
   finance: FinanceDocument;
   settings: AppSettings;
+  goals: Goal[];
 }
 
 export type BackupErrorCode = 'not-halo' | 'wrong-password' | 'corrupt' | 'weak-password' | 'mismatch';

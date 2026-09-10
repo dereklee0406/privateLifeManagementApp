@@ -5,6 +5,12 @@ import type { ExpenseSplit, ExpenseSplitDraft } from '../model/finance/ExpenseSp
 import { isSplitDraftValid, recalculateEqualShares } from '../model/finance/ExpenseSplit';
 import type { IncomeDraft, IncomeEntry } from '../model/finance/Income';
 import type { Loan, LoanDraft } from '../model/finance/Loan';
+import type { CardDebtInput } from '../model/finance/netWorth';
+import { computeNetWorth } from '../model/finance/netWorth';
+import type { NetWorthHistoryRow } from '../model/finance/netWorthHistory';
+import { upsertMonthlySnapshot } from '../model/finance/netWorthHistory';
+import type { SavingsTarget, SavingsTargetDraft } from '../model/finance/savingsTarget';
+import { isSavingsTargetDraftValid } from '../model/finance/savingsTarget';
 import type { TransferDraft, TransferEntry } from '../model/finance/Transfer';
 import type { FinanceRepository } from '../model/finance/FinanceRepository';
 import { persistMediaFile, removeMediaFile } from '../data/mediaStore';
@@ -26,9 +32,10 @@ import {
 /**
  * Purpose: orchestrate on-device personal accounting without bank APIs or ledgers.
  * Inputs: FinanceRepository plus drafts from the spend / income / Money forms.
- * Outputs: Expense, Income, Budget, Asset, Loan, Transfer, ExpenseSplit snapshots.
+ * Outputs: Expense, Income, Budget, Asset, Loan, Transfer, ExpenseSplit, savings target, history.
  * Side effects: JSON persistence; receipt photo copy via mediaStore.
  * Design decisions: net worth and leftover are derived in Model; this class only stores facts.
+ *   Savings target + monthly snapshots persist on the finance document (same store as assets).
  */
 export class FinanceController {
   constructor(
@@ -63,6 +70,28 @@ export class FinanceController {
   async listLoans(): Promise<Loan[]> {
     const { loans } = await this.repository.load();
     return loans;
+  }
+
+  /**
+   * Purpose: read the persisted savings goal (if any).
+   * Inputs: none (loads finance document).
+   * Outputs: SavingsTarget or undefined.
+   * Side effects: repository load.
+   */
+  async getSavingsTarget(): Promise<SavingsTarget | undefined> {
+    const { savingsTarget } = await this.repository.load();
+    return savingsTarget;
+  }
+
+  /**
+   * Purpose: read monthly net-worth history newest first.
+   * Inputs: none (loads finance document).
+   * Outputs: NetWorthHistoryRow[].
+   * Side effects: repository load.
+   */
+  async listNetWorthHistory(): Promise<NetWorthHistoryRow[]> {
+    const { netWorthHistory } = await this.repository.load();
+    return netWorthHistory ?? [];
   }
 
   async listTransfers(): Promise<TransferEntry[]> {
@@ -481,6 +510,58 @@ export class FinanceController {
       ...document,
       loans: document.loans.filter((item) => item.id !== id),
     });
+  }
+
+  /**
+   * Purpose: persist a typed savings goal on the finance document.
+   * Inputs: SavingsTargetDraft from the Worth form.
+   * Outputs: SavingsTarget snapshot.
+   * Side effects: finance JSON write.
+   * Design decisions: same store as assets so backup includes the goal without a settings key.
+   */
+  async upsertSavingsTarget(draft: SavingsTargetDraft): Promise<SavingsTarget> {
+    if (!isSavingsTargetDraftValid(draft)) {
+      throw new Error('Savings target needs an amount greater than zero.');
+    }
+    const document = await this.repository.load();
+    const savingsTarget: SavingsTarget = {
+      amount: Math.max(0, draft.amount),
+      currency: draft.currency,
+      updatedAt: new Date().toISOString(),
+    };
+    await this.repository.save({ ...document, savingsTarget });
+    return savingsTarget;
+  }
+
+  /**
+   * Purpose: remove the savings goal without touching assets.
+   * Inputs: none.
+   * Outputs: void.
+   * Side effects: finance JSON write (clears savingsTarget).
+   */
+  async clearSavingsTarget(): Promise<void> {
+    const document = await this.repository.load();
+    const { savingsTarget: _removed, ...rest } = document;
+    await this.repository.save({ ...rest, savingsTarget: undefined });
+  }
+
+  /**
+   * Purpose: write this month’s live net-worth row (upsert).
+   * Inputs: card debt rows, reporting currency, optional now (tests).
+   * Outputs: newest-first history after persist.
+   * Side effects: finance JSON write.
+   * Design decisions: live math stays in computeNetWorth; this only stores the month’s facts.
+   */
+  async recordMonthlyNetWorthSnapshot(
+    cards: CardDebtInput[],
+    currency: MoneyCurrency,
+    now: Date = new Date(),
+  ): Promise<NetWorthHistoryRow[]> {
+    const document = await this.repository.load();
+    const live = computeNetWorth(document.assets, document.loans, cards, currency);
+    const netWorthHistory = upsertMonthlySnapshot(document.netWorthHistory ?? [], live, now);
+    await this.repository.save({ ...document, netWorthHistory });
+    return netWorthHistory;
   }
 
   /**

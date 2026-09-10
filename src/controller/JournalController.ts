@@ -219,7 +219,11 @@ export class JournalController {
   }
 
   /**
-   * Purpose: expose today's writing invitation.
+   * Purpose: expose today's writing invitation id (Today pack, date rotation).
+   * Inputs: none (clock inside getDailyPrompt).
+   * Outputs: PromptId; View translates `prompts.{id}`.
+   * Side effects: none.
+   * Design decisions: Model stays language-free; catalogs live in i18n.
    */
   getTodayPrompt(): string {
     return getDailyPrompt();

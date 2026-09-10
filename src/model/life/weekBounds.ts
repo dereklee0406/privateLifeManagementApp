@@ -71,3 +71,39 @@ export function thisCalendarWeek(now: Date = new Date(), weekStart: WeekStart = 
   const end = endOfWeek(now, weekStart);
   return { start, end, startKey: toDayKey(start), endKey: toDayKey(end) };
 }
+
+/**
+ * Purpose: previous week, same weekday span as this week so far (Wed vs last Wed, not vs a full week).
+ * Inputs: now and weekStart.
+ * Outputs: start/end Dates and YYYY-MM-DD keys.
+ * Side effects: none.
+ * Design decisions: Insights vs-last-week tiles stay fair mid-week. A Wednesday board compares
+ *   Mon–Wed to last Mon–Wed, not to last week’s seven days.
+ */
+export function alignedPreviousWeekSoFar(now: Date = new Date(), weekStart: WeekStart = 'monday'): WeekRange {
+  const current = thisWeekSoFar(now, weekStart);
+  const previous = lastFullWeek(now, weekStart);
+  const span = civilDaysInclusive(current.start, current.end);
+  const end = new Date(
+    previous.start.getFullYear(),
+    previous.start.getMonth(),
+    previous.start.getDate() + span - 1,
+  );
+  return { start: previous.start, end, startKey: toDayKey(previous.start), endKey: toDayKey(end) };
+}
+
+/**
+ * Purpose: inclusive local civil-day count between two midnights.
+ * Inputs: start and end Dates (time-of-day ignored).
+ * Outputs: integer ≥ 1 when end ≥ start; 0 when inverted.
+ * Side effects: none.
+ * Design decisions: round the ms delta so DST 23h/25h days still count as one civil day.
+ */
+function civilDaysInclusive(start: Date, end: Date): number {
+  const from = new Date(start.getFullYear(), start.getMonth(), start.getDate()).getTime();
+  const to = new Date(end.getFullYear(), end.getMonth(), end.getDate()).getTime();
+  if (to < from) {
+    return 0;
+  }
+  return Math.round((to - from) / 86_400_000) + 1;
+}

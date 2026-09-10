@@ -21,6 +21,7 @@ export const AppConfig = {
     entriesKey: 'halo.journal.entries.v1',
     settingsKey: 'halo.journal.settings.v1',
     remindersKey: 'halo.journal.reminders.v1',
+    goalsKey: 'halo.goals.v1',
     financeKey: 'halo.finance.v1',
     fxRatesKey: 'halo.finance.fx.v1',
     trashKey: 'halo.trash.v1',

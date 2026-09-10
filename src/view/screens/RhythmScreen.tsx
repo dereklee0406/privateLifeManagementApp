@@ -5,6 +5,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { appHref } from '../../utils/navigation';
 import { hapticLight } from '../../utils/haptics';
+import { HubCaptureFab } from '../components/HubCaptureFab';
 import { HubSegmentControl, type HubSegmentOption } from '../components/HubSegmentControl';
 import { LargeTitle } from '../components/LargeTitle';
 import { ScreenScaffold } from '../components/ScreenScaffold';
@@ -12,19 +13,19 @@ import { useI18n } from '../i18n';
 import { useThemeColors } from '../theme/ThemeProvider';
 import { raisedSurface } from '../theme/tokens';
 import { tabScenePaddingBottom, type } from '../theme/typography';
+import { RhythmFocusPanel } from './rhythm/RhythmFocusPanel';
 import { RhythmStreaksPanel } from './rhythm/RhythmStreaksPanel';
 import { RhythmTasksPanel } from './rhythm/RhythmTasksPanel';
 
-export type RhythmSegment = 'tasks' | 'streaks';
+export type RhythmSegment = 'tasks' | 'streaks' | 'focus';
 
 /**
- * Purpose: Tab 3 Habits & Rhythm hub — Due & Tasks + Consistency heatmap in one place.
- * Inputs: optional `tab` search param (`tasks` | `streaks`) for deep links from `/habits`.
+ * Purpose: Tab 3 Habits & Rhythm hub — Due, Streaks, and Focus (Goals).
+ * Inputs: optional `tab` search param (`tasks` | `streaks` | `focus`) for deep links from `/habits` and Today.
  * Outputs: editorial header, HubSegmentControl, active panel only.
  * Side effects: navigation to create reminder; segment haptic via HubSegmentControl.
- * Design decisions: thin View orchestration; list/heatmap logic lives in panel components;
- *   shared HubSegmentControl matches Money / Journal tactile pattern (100% visual consistency).
- *   Journal owns Calendar companion (Timeline / Calendar). This screen owns Tab 3 landing.
+ * Design decisions: thin View orchestration; list/heatmap/goal logic lives in panel components;
+ *   shared HubSegmentControl matches Wallet / Journal tactile pattern. Header + stays Habit/One-off.
  */
 export function RhythmScreen({
   initialSegment = 'tasks',
@@ -38,7 +39,13 @@ export function RhythmScreen({
   const params = useLocalSearchParams<{ tab?: string }>();
 
   const paramSegment: RhythmSegment | null =
-    params.tab === 'streaks' ? 'streaks' : params.tab === 'tasks' ? 'tasks' : null;
+    params.tab === 'streaks'
+      ? 'streaks'
+      : params.tab === 'tasks'
+        ? 'tasks'
+        : params.tab === 'focus'
+          ? 'focus'
+          : null;
 
   const [segment, setSegment] = useState<RhythmSegment>(paramSegment ?? initialSegment);
 
@@ -52,6 +59,7 @@ export function RhythmScreen({
     () => [
       { id: 'tasks', label: t('rhythm.tabTasks'), icon: 'checkbox-outline' },
       { id: 'streaks', label: t('rhythm.tabStreaks'), icon: 'flame-outline' },
+      { id: 'focus', label: t('rhythm.tabFocus'), icon: 'flag-outline' },
     ],
     [t],
   );
@@ -68,9 +76,11 @@ export function RhythmScreen({
       >
         <View style={styles.topRow}>
           <View style={styles.titleBlock}>
-            <Text style={[type.footnote, styles.headerKicker, { color: colors.accent }]}>
-              {t('rhythm.headerKicker')}
-            </Text>
+            {t('rhythm.headerKicker') ? (
+              <Text style={[type.footnote, styles.headerKicker, { color: colors.accent }]}>
+                {t('rhythm.headerKicker')}
+              </Text>
+            ) : null}
             <LargeTitle title={t('rhythm.headerTitle')} />
           </View>
           <Pressable
@@ -95,8 +105,15 @@ export function RhythmScreen({
 
         <HubSegmentControl options={segmentOptions} value={segment} onChange={setSegment} />
 
-        {segment === 'tasks' ? <RhythmTasksPanel /> : <RhythmStreaksPanel />}
+        {segment === 'tasks' ? (
+          <RhythmTasksPanel />
+        ) : segment === 'streaks' ? (
+          <RhythmStreaksPanel />
+        ) : (
+          <RhythmFocusPanel />
+        )}
       </ScrollView>
+      <HubCaptureFab />
     </ScreenScaffold>
   );
 }

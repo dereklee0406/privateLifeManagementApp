@@ -4,7 +4,9 @@ import type { Expense } from './Expense';
 import type { ExpenseSplit } from './ExpenseSplit';
 import type { IncomeEntry } from './Income';
 import type { Loan } from './Loan';
+import type { NetWorthHistoryRow } from './netWorthHistory';
 import type { RecurringSpend } from './recurringSpend';
+import type { SavingsTarget } from './savingsTarget';
 import type { TransferEntry } from './Transfer';
 import type { MoneyCurrency } from '../settings/AppSettings';
 
@@ -63,6 +65,13 @@ export interface FinanceDocument {
   transfers?: TransferEntry[];
   /** Optional split-expense settlements among friends/family. Missing on older documents. */
   splits?: ExpenseSplit[];
+  /**
+   * Optional savings goal. Lives here (not settings) because cash/bank assets already persist
+   * on this document — one store for Worth + backup.
+   */
+  savingsTarget?: SavingsTarget;
+  /** Monthly net-worth history rows. Missing on older documents. */
+  netWorthHistory?: NetWorthHistoryRow[];
 }
 
 /**
@@ -78,5 +87,6 @@ export function emptyFinanceDocument(): FinanceDocument {
     recurringSpends: [],
     transfers: [],
     splits: [],
+    netWorthHistory: [],
   };
 }

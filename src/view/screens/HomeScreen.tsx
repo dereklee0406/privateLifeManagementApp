@@ -8,39 +8,45 @@ import { useJournal } from '../../controller/JournalProvider';
 import { useReminders } from '../../controller/ReminderProvider';
 import { useSettings } from '../../controller/SettingsProvider';
 import { overspentBudgets } from '../../model/finance/financeStats';
+import { pickTodayPrediction } from '../../model/insights/predictions';
 import { pickHomePhotoHighlight } from '../../model/journal/homePhotoHighlight';
 import { suggestLifeReflection } from '../../model/life/reflectionCue';
 import { computeWeeklyLifeSummary } from '../../model/life/weeklySummary';
 import { resolveWeekStart } from '../../model/settings/AppSettings';
 import { onThisDayMemories } from '../../model/journal/onThisDay';
 import { nextUpCard } from '../../model/today/nextUp';
-import { formatHeaderDate, formatMemoryDate } from '../../utils/dateUtils';
+import { formatLongDate, formatMemoryDate } from '../../utils/dateUtils';
 import { appHref } from '../../utils/navigation';
-import { hapticLight, hapticSuccess } from '../../utils/haptics';
+import { hapticSuccess } from '../../utils/haptics';
 import { GlassSurface } from '../components/GlassSurface';
 import { EmptyState } from '../components/EmptyState';
-import { GlobalFastCaptureSheet } from '../components/GlobalFastCaptureSheet';
-import { InlineHomeQuickAdd } from '../components/InlineHomeQuickAdd';
+import { HubCaptureFab } from '../components/HubCaptureFab';
 import { JournalMediaImage } from '../components/JournalMediaImage';
 import { LargeTitle } from '../components/LargeTitle';
 import { QuickMoodBar } from '../components/QuickMoodBar';
-import { QuickSpendSheet } from '../components/QuickSpendSheet';
 import { ScreenScaffold } from '../components/ScreenScaffold';
+import { TodayFocusRow } from '../components/TodayFocusRow';
+import { TodayPredictionLine } from '../components/TodayPredictionLine';
 import { TodayRecurringStrip } from '../components/TodayRecurringStrip';
+import { TodaySeasonMark } from '../components/TodaySeasonMark';
 import { WeekStatChips } from '../components/WeekStatChips';
 import { useThemeColors } from '../theme/ThemeProvider';
-import { fonts, groupedRadius, raisedAccent, raisedSurface } from '../theme/tokens';
+import { fonts, groupedRadius, raisedSurface } from '../theme/tokens';
 import { tabScenePaddingBottom, type } from '../theme/typography';
 import { reminderTypeTextProps, reminderTypeTextStyle } from '../components/scalableLabel';
-import { useI18n, localizeNextUpBadge, localizeWeeklyChips, localizeWeeklySummary } from '../i18n';
+import { greetingKeyForHour, useI18n, localizeNextUpBadge, localizeWeeklyChips, localizeWeeklySummary } from '../i18n';
 
 /**
- * Purpose: Today home — greeting, compact Write/Record/Spend capsule, fast loops, Next Up, week chips, photos.
- * Inputs: journal, reminders, finance, settings.
- * Outputs: a short first screen. No charts. No net worth.
- * Side effects: navigates to compose, voice, spend, search, reminder, card, memories, or a past page;
+ * Purpose: Today command center — 30s ritual then below-fold memory.
+ * Inputs: journal, reminders, finance, settings, goals (one compact Focus row), derived Season mark.
+ * Outputs: greeting + streak + Season line + optional prediction, Next Up, due strip, one active Goal; mood / week / photos / on-this-day below.
+ * Side effects: navigates to compose, spend, search, reminder, settings, memories, Rhythm Focus, Insights, or a past page;
  *   1-tap completeReminder on Next Up when itemType is reminder;
- *   FAB opens GlobalFastCaptureSheet; spend tile hands off to QuickSpendSheet.
+ *   shared HubCaptureFab opens Write / Spend / Habit.
+ * Design decisions: capsule Write/Record/Spend and InlineHomeQuickAdd removed so capture is one FAB;
+ *   Settings gear lives on this header (Insights cog may remain); memories stay below the fold;
+ *   Focus is a compact row, not a second hero; Season is one muted line under the greeting;
+ *   at most one prediction under Season (skipped when it is the Next Up item); no new pushes.
  */
 export function HomeScreen() {
   const colors = useThemeColors();
@@ -49,13 +55,16 @@ export function HomeScreen() {
   const { insights, entries } = useJournal();
   const { settings } = useSettings();
   const { reminders, creditCards, completeReminder } = useReminders();
-  const { expenses, budgets } = useFinance();
+  const { expenses, budgets, recurringSpends } = useFinance();
   const { t, intlLocale } = useI18n();
   const [completingNext, setCompletingNext] = useState(false);
-  const [captureOpen, setCaptureOpen] = useState(false);
-  const [quickSpendOpen, setQuickSpendOpen] = useState(false);
   const now = useMemo(() => new Date(), [entries.length, reminders.length, expenses.length]);
-  const headerDate = useMemo(() => formatHeaderDate(now, intlLocale), [now, intlLocale]);
+  const headerDate = useMemo(() => formatLongDate(now, intlLocale), [now, intlLocale]);
+  const writerName = settings.writerName.trim() || t('home.defaultName');
+  const hello = t('home.hello', {
+    greeting: t(greetingKeyForHour(now.getHours())),
+    name: writerName,
+  });
   const weekStartsOn = resolveWeekStart(settings);
   const next = useMemo(
     () => nextUpCard(reminders, creditCards, settings.defaultCurrency, now),
@@ -88,6 +97,21 @@ export function HomeScreen() {
   const budgetOver =
     overspentBudgets(budgets, expenses, now.getFullYear(), now.getMonth(), settings.defaultCurrency).length > 0;
   const cue = suggestLifeReflection(week.daysWritten, budgetOver, now);
+  const prediction = useMemo(
+    () =>
+      pickTodayPrediction({
+        reminders,
+        creditCards,
+        recurringSpends,
+        expenses,
+        budgets,
+        journalDaysWrittenThisWeek: week.daysWritten,
+        currency: settings.defaultCurrency,
+        now,
+        nextUp: next,
+      }),
+    [reminders, creditCards, recurringSpends, expenses, budgets, week.daysWritten, settings.defaultCurrency, now, next],
+  );
 
   const photoSourceLabel =
     photoHighlight?.source === 'onThisDay'
@@ -120,66 +144,49 @@ export function HomeScreen() {
       >
         <View style={styles.topRow}>
           <View style={styles.titleBlock}>
-            <Text style={[type.footnote, styles.kicker, { color: colors.accent }]}>
-              {headerDate.weekday.toUpperCase()}
-            </Text>
-            <LargeTitle title={headerDate.title} />
+            <Text style={[type.footnote, styles.dateLine, { color: colors.muted }]}>{headerDate}</Text>
+            <LargeTitle title={hello} />
+            {insights.streakDays > 0 ? (
+              <Text style={[styles.streak, { color: colors.muted }]}>
+                {insights.streakDays === 1 ? t('home.streakOne') : t('home.streak', { count: insights.streakDays })}
+              </Text>
+            ) : null}
+            <TodaySeasonMark />
+            {prediction ? <TodayPredictionLine prediction={prediction} /> : null}
           </View>
-          <Pressable
-            onPress={() => router.push('/(tabs)/journal')}
-            style={({ pressed }) => [
-              raisedSurface(colors, 14),
-              styles.searchButton,
-              {
-                transform: [{ scale: pressed ? 0.94 : 1 }],
-                opacity: pressed ? 0.8 : 1,
-              },
-            ]}
-            accessibilityRole="button"
-            accessibilityLabel={t('home.searchA11y')}
-          >
-            <Ionicons name="search" size={20} color={colors.ink} />
-          </Pressable>
+          <View style={styles.headerActions}>
+            <Pressable
+              onPress={() => router.push('/(tabs)/journal')}
+              style={({ pressed }) => [
+                raisedSurface(colors, 14),
+                styles.iconButton,
+                {
+                  transform: [{ scale: pressed ? 0.94 : 1 }],
+                  opacity: pressed ? 0.8 : 1,
+                },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={t('home.searchA11y')}
+            >
+              <Ionicons name="search" size={20} color={colors.ink} />
+            </Pressable>
+            <Pressable
+              onPress={() => router.push(appHref('/settings'))}
+              style={({ pressed }) => [
+                raisedSurface(colors, 14),
+                styles.iconButton,
+                {
+                  transform: [{ scale: pressed ? 0.94 : 1 }],
+                  opacity: pressed ? 0.8 : 1,
+                },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={t('tabs.settings')}
+            >
+              <Ionicons name="settings-outline" size={20} color={colors.ink} accessible={false} importantForAccessibility="no" />
+            </Pressable>
+          </View>
         </View>
-
-        <View style={[raisedSurface(colors, 22), styles.capsuleBar, { backgroundColor: colors.accentSoft }]}>
-          <Pressable
-            onPress={() => router.push('/compose?mode=text')}
-            style={styles.capsuleHit}
-            accessibilityLabel={t('common.write')}
-          >
-            <Ionicons name="create-outline" size={20} color={colors.accent} />
-            <Text style={[styles.capsuleLabel, { color: colors.accent }]} numberOfLines={1}>
-              {t('common.write')}
-            </Text>
-          </Pressable>
-          <View style={[styles.capsuleDivider, { backgroundColor: colors.line }]} />
-          <Pressable
-            onPress={() => router.push('/compose?mode=voice')}
-            style={styles.capsuleHit}
-            accessibilityLabel={t('common.record')}
-          >
-            <Ionicons name="mic-outline" size={20} color={colors.accent} />
-            <Text style={[styles.capsuleLabel, { color: colors.accent }]} numberOfLines={1}>
-              {t('common.record')}
-            </Text>
-          </Pressable>
-          <View style={[styles.capsuleDivider, { backgroundColor: colors.line }]} />
-          <Pressable
-            onPress={() => router.push('/expense/new')}
-            style={styles.capsuleHit}
-            accessibilityLabel={t('home.spend')}
-          >
-            <Ionicons name="wallet-outline" size={20} color={colors.accent} />
-            <Text style={[styles.capsuleLabel, { color: colors.accent }]} numberOfLines={1}>
-              {t('home.spend')}
-            </Text>
-          </Pressable>
-        </View>
-
-        <InlineHomeQuickAdd />
-        <TodayRecurringStrip />
-        <QuickMoodBar />
 
         {next && nextBadge ? (
           <GlassSurface style={styles.weekCard} radius={groupedRadius}>
@@ -256,6 +263,10 @@ export function HomeScreen() {
           </GlassSurface>
         )}
 
+        <TodayRecurringStrip />
+        <TodayFocusRow />
+        <QuickMoodBar />
+
         <GlassSurface style={styles.weekCard} radius={groupedRadius}>
           <Text style={[styles.stripLabel, { color: colors.accent }]}>{t('home.thisWeek')}</Text>
           <WeekStatChips chips={weekChips} />
@@ -318,47 +329,16 @@ export function HomeScreen() {
 
         {cue ? (
           <Pressable
-            onPress={() => router.push(`/compose?mode=text&prompt=${encodeURIComponent(cue.prompt)}`)}
+            onPress={() =>
+              router.push(`/compose?mode=text&prompt=${encodeURIComponent(t(`prompts.${cue.promptId}`))}`)
+            }
           >
             <Text style={[styles.cue, { color: colors.muted }]}>{cue.line}</Text>
           </Pressable>
         ) : null}
-
-        {insights.streakDays > 0 ? (
-          <Text style={[styles.streak, { color: colors.faint }]}>
-            {insights.streakDays === 1 ? t('home.streakOne') : t('home.streak', { count: insights.streakDays })}
-          </Text>
-        ) : null}
       </ScrollView>
 
-      <Pressable
-        onPress={() => {
-          void hapticLight();
-          setCaptureOpen(true);
-        }}
-        accessibilityRole="button"
-        accessibilityLabel={t('capture.title')}
-        style={({ pressed }) => [
-          raisedAccent(colors, 28),
-          styles.fab,
-          {
-            bottom: tabScenePaddingBottom(insets.bottom) + 12,
-            right: 22,
-            transform: [{ scale: pressed ? 0.94 : 1 }],
-          },
-        ]}
-      >
-        <Ionicons name="add" size={28} color={colors.accentInk} accessible={false} importantForAccessibility="no" />
-      </Pressable>
-      <GlobalFastCaptureSheet
-        visible={captureOpen}
-        onClose={() => setCaptureOpen(false)}
-        onSelectSpend={() => {
-          setCaptureOpen(false);
-          setTimeout(() => setQuickSpendOpen(true), 280);
-        }}
-      />
-      <QuickSpendSheet visible={quickSpendOpen} onClose={() => setQuickSpendOpen(false)} />
+      <HubCaptureFab />
     </ScreenScaffold>
   );
 }
@@ -369,7 +349,7 @@ const styles = StyleSheet.create({
   },
   topRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
     gap: 12,
     marginBottom: 16,
@@ -378,44 +358,22 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
   },
-  kicker: {
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
+  dateLine: {
     marginBottom: 2,
     fontFamily: fonts.bodySemi,
   },
-  searchButton: {
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingTop: 4,
+  },
+  iconButton: {
     width: 44,
     height: 44,
     borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  capsuleBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    minHeight: 52,
-    marginBottom: 16,
-    paddingHorizontal: 4,
-  },
-  capsuleHit: {
-    flex: 1,
-    minWidth: 0,
-    minHeight: 48,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingHorizontal: 6,
-  },
-  capsuleLabel: {
-    fontFamily: fonts.bodySemi,
-    fontSize: 15,
-    flexShrink: 1,
-  },
-  capsuleDivider: {
-    width: StyleSheet.hairlineWidth,
-    height: 24,
   },
   weekCard: {
     padding: 18,
@@ -558,14 +516,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
     fontSize: 15,
     lineHeight: 22,
-    marginTop: 16,
-  },
-  fab: {
-    position: 'absolute',
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
+    marginTop: 4,
   },
 });

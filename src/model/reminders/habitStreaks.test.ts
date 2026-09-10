@@ -5,6 +5,7 @@ import {
   calculateHabitStreak,
   computeOverallHabitRhythm,
   generateHeatmapMatrix,
+  habitHitRateBetween,
 } from './habitStreaks';
 
 /**
@@ -221,5 +222,26 @@ describe('computeOverallHabitRhythm', () => {
       overallConsistency30Days: 0,
       bestCurrentStreak: 0,
     });
+  });
+});
+
+describe('habitHitRateBetween', () => {
+  it('averages unique hits in the window and returns null with no active habits', () => {
+    const run = reminder({
+      id: 'run',
+      title: 'Run',
+      completedDayKeys: ['2026-09-01', '2026-09-02', '2026-09-08'],
+    });
+    const hit = habitHitRateBetween([run], '2026-09-01', '2026-09-04');
+    assert.equal(hit.activeHabitCount, 1);
+    assert.equal(hit.rate, 0.5);
+
+    const none = habitHitRateBetween(
+      [reminder({ id: 'once', title: 'Once', recurrence: { type: 'once', dayKey: '2026-09-01' } })],
+      '2026-09-01',
+      '2026-09-04',
+    );
+    assert.equal(none.rate, null);
+    assert.equal(none.activeHabitCount, 0);
   });
 });

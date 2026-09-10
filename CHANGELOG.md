@@ -2,6 +2,48 @@
 
 ## 2026-09-10
 - Date: 2026-09-10
+- Description: **Insights board pack** — Tab 5 Insights is no longer a sparse three-line scoreboard. This week | This month keeps the same math and pressure, but the screen now reads as a private board pack: Season hero (rank + 0–100 meter + writing/habits/envelopes bars; missing pillars omitted), 2-column glance tiles with vs-last deltas (aligned week/month-to-date), a 7-cell writing strip or month pace bar, and one editorial takeaway. Sparse first week/month still draws the board and invites Write / Habit / Spend (Worth on month) via existing hubs. No cloud AI, no sixth tab, no Rhythm/Wallet list reprint.
+- Affected modules: Model (`insights/boardFacts.ts`, `life/weekBounds.ts`, `season/seasonRank.ts`, tests); View (`InsightsScreen.tsx`, `InsightsSeasonHero.tsx`, `InsightsGlanceGrid.tsx`, `InsightsWeekStrip.tsx`, `InsightsTakeaway.tsx`, `insightsCopy.ts`); i18n (en / zh-Hant / zh-Hans / ja); CHANGELOG
+- Reason: UX — Sunday / 1st Insights should feel like Apple Health + YNAB glance in Halo clay, not three muted lines
+- Impact: Medium
+
+## 2026-09-10
+- Date: 2026-09-10
+- Description: **Future Life OS MVP** — On-device **predictive insights** (at most one Today line under Season, optional Insights This week echo; overdue/card due → sub renewal ≤7d → envelope pace → writing quiet Thu–Sun; skip if it duplicates Next Up). **Prompt library** with tagged Today / Gratitude / Review / Focus ids (`prompts.*` in en / zh-Hant / zh-Hans / ja); picker from Journal header and Compose; `getDailyPrompt` stays the date rotation. **Wallet Worth sparkline** from `netWorthHistory` as View bars (omit if empty; static for reduce-motion). **Shareable monthly-report image** (`MonthlyReportCard` + `react-native-view-shot` + expo-sharing on Insights This month; web text summary or “Save on phone”). No cloud AI, no new push notifications.
+- Affected modules: Model (`insights/predictions.ts`, `insights/monthlyShare.ts`, `journal/prompts.ts`, `finance/netWorthSparkline.ts`, `life/reflectionCue.ts`, tests); View (`TodayPredictionLine`, `PromptLibrarySheet`, `NetWorthSparkline`, `MonthlyReportCard`, `MonthlyReportShareButton`, `HomeScreen`, `InsightsScreen`, `JournalScreen`, `ComposeScreen`, `WalletWorthPanel`, `insightsCopy.ts`); Data (`shareMonthCard.native.ts` / `.web.ts`); i18n (en / zh-Hant / zh-Hans / ja); CHANGELOG; `react-native-view-shot` 5.1.0
+- Reason: Product — predict the next useful action from data already on the phone; export a month picture without a feed
+- Impact: High
+
+## 2026-09-10
+- Date: 2026-09-10
+- Description: **Halo Life OS Days 22–30 (Season + Insights month + onboarding map)** — Private **Season** rank is derived (not stored) from 30-day writing days, habit hit rate, and budget discipline: Spark → Ember → Forge → Temper → Steel. Compact mark on Today under the greeting (Next Up stays the hero); Insights shows the same rank. Insights is **This week | This month** synthesis + deep links (not a reprint of Rhythm/Wallet lists). Monthly board pack: pages, habit hits, spend vs last month, net-worth snapshot delta, one pressure line (rule-based, no cloud LLM). Onboarding adds a 15s hub map after name + privacy, with an optional lock mention. Close-the-day skipped so Today density holds. New `season.*` / `insights.*` / onboarding map strings in en / zh-Hant / zh-Hans / ja.
+- Affected modules: Model (`season/seasonRank.ts`, `insights/pressure.ts`, `insights/weeklyReport.ts`, `insights/monthlyReport.ts`, `journalStats.ts`, `habitStreaks.ts`, tests); View (`TodaySeasonMark.tsx`, `HomeScreen.tsx`, `InsightsScreen.tsx`, `OnboardingScreen.tsx`, `insightsCopy.ts`); i18n (en / zh-Hant / zh-Hans / ja); CHANGELOG
+- Reason: Product — private mastery loop and Sunday/month scoreboard without XP, community, or cloud AI
+- Impact: High
+
+## 2026-09-10
+- Date: 2026-09-10
+- Description: **Halo Life OS Days 15–21 (Wallet Worth)** — Wallet hub gains a fourth **Worth** segment (always visible, not an advanced-finance lab). Empty state invites the first manual asset. CRUD for existing Asset and Loan models (cash / bank / investment / property; mortgage / personal / car). Savings target compares a typed goal to cash + bank only (investments stay holdings). Monthly net-worth snapshots persist on the finance document beside assets; live math stays in `computeNetWorth`. Removed Cashflow “coming later” copy. New `worth.*` i18n in en / zh-Hant / zh-Hans / ja.
+- Affected modules: Model (`savingsTarget.ts`, `netWorthHistory.ts`, `Account.ts`, `normalizeFinance.ts`, tests); Controller (`FinanceController.ts`, `FinanceProvider.tsx`); View (`MoneyScreen.tsx`, `WalletWorthPanel.tsx`, `AssetEditScreen.tsx`, `LoanEditScreen.tsx`); Routes (`app/asset/*`, `app/loan/*`, `app/_layout.tsx`); Backup (`serializeBackup.ts`); i18n (en / zh-Hant / zh-Hans / ja); CHANGELOG
+- Reason: Product — first-time investor and side-hustler need a one-number Worth home without bank login or a brokerage cockpit
+- Impact: High
+
+## 2026-09-10
+- Date: 2026-09-10
+- Description: **Halo Life OS Days 8–14 (Goals / Focus)** — New Goal model (title, why, target date, optional metric, linked reminder IDs, active/paused/done) with pure progress math (metric > linked check-ins > calendar). Thin GoalController + GoalProvider persist on-device JSON; encrypted backup serialize/restore includes Goals (older v1 files without `goals` restore as empty). Rhythm gains a third **Focus** segment (list/create/edit); header + still creates Habit/One-off. Today shows one compact active-goal row under the due strip (not a second hero). Reminder schema unchanged — links live on the Goal.
+- Affected modules: Model (`src/model/goals/*`, `BackupDocument.ts`, `serializeBackup.ts`); Controller (`GoalController.ts`, `GoalProvider.tsx`, `BackupController.ts`); Data (`GoalsLocalStore.ts`); View (`RhythmScreen.tsx`, `RhythmFocusPanel.tsx`, `GoalEditScreen.tsx`, `TodayFocusRow.tsx`, `HomeScreen.tsx`, `BackupPanel.tsx`); Routes (`app/_layout.tsx`, `app/goals/*`); Config (`appConfig.ts`); i18n (`goals.*` + `rhythm.tabFocus` in en / zh-Hant / zh-Hans / ja); CHANGELOG
+- Reason: Product — real Goals with progress on Rhythm Focus and one compact Today row, not reminder-kind labels
+- Impact: High
+
+## 2026-09-10
+- Date: 2026-09-10
+- Description: **Halo Life OS Days 1–7 (ritual and language)** — Locked tab = title = capture verb across en / zh-Hant / zh-Hans / ja: Journal (not Pages), Wallet (not Money/Overview), Write / Spend / Habit. Today is a 30-second ritual (greeting via `home.hello` + streak + Next Up + due strip; photo memories below the fold) with a Settings gear on the header. One `HubCaptureFab` on all five hubs opens a 3-tile Fast Capture sheet; Transfer stays reachable from Wallet (`/transfer/new`), not the sheet. Removed Today capsule Write/Record/Spend and `InlineHomeQuickAdd`. Mood check-in is Good / Steady / Off / Rough. Insights kicker is This week / Pulse, not PERSONAL PULSE. Settings → Photos opens `/memories`. Tone pass: field notebook, clay neumorphism kept.
+- Affected modules: View (`HomeScreen.tsx`, `HubCaptureFab.tsx`, `GlobalFastCaptureSheet.tsx`, `QuickMoodBar.tsx`, `FloatingTabBar.tsx`, `JournalScreen.tsx`, `RhythmScreen.tsx`, `MoneyScreen.tsx`, `InsightsScreen.tsx`, `SettingsScreen.tsx`, `LargeTitle.tsx`); i18n (`en.ts`, `zh-Hant.ts`, `zh-Hans.ts`, `ja.ts`, `greeting.ts`); Routes (`app/(tabs)/_layout.tsx`); CHANGELOG. Removed `InlineHomeQuickAdd.tsx`.
+- Reason: Product — daily 30s ritual and naming lock; cut capture duplication and spa copy
+- Impact: High
+
+## 2026-09-10
+- Date: 2026-09-10
 - Description: **Glanceable Money Spends list** — Redesigned Cashflow spend rows so “what / how much / when / how paid” reads in one second: day-group headers (`date.today` / `date.yesterday` / `formatShortDate`), note-or-category primary title, right-aligned tabular amount with a second FX estimate line for foreign spends, and a glanceable card/cash badge. Tactile press (scale + opacity) still opens `/expense/[id]`. New `date.yesterday` key with parity across en / zh-Hant / zh-Hans / ja.
 - Affected modules: View (`MoneyScreen.tsx`, `SpendCardBadge.tsx`); i18n (`en.ts`, `zh-Hant.ts`, `zh-Hans.ts`, `ja.ts`); CHANGELOG
 - Reason: UX — amount-first ISO rows made scanning “what I spent” hard; duplicate Lunch cards had almost no visual distinction

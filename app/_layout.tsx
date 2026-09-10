@@ -8,6 +8,7 @@ import * as SystemUI from 'expo-system-ui';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { FinanceProvider } from '@/controller/FinanceProvider';
 import { FxRateProvider } from '@/controller/FxRateProvider';
+import { GoalProvider } from '@/controller/GoalProvider';
 import { JournalProvider } from '@/controller/JournalProvider';
 import { LockProvider, useLock } from '@/controller/LockProvider';
 import { ReminderProvider } from '@/controller/ReminderProvider';
@@ -124,6 +125,10 @@ function RootNavigation() {
         <Stack.Screen name="expense/new" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="expense/[id]" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="income/new" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
+        <Stack.Screen name="asset/new" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
+        <Stack.Screen name="asset/[id]" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
+        <Stack.Screen name="loan/new" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
+        <Stack.Screen name="loan/[id]" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="transfer/new" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="memories" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="settings" options={{ animation: 'slide_from_right' }} />
@@ -134,6 +139,7 @@ function RootNavigation() {
         <Stack.Screen name="payment-cards" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="subscriptions" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="habits" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="goals" options={{ animation: 'slide_from_right' }} />
       </Stack>
     </>
   );
@@ -154,6 +160,7 @@ export default function RootLayout() {
           <TypographyProvider>
           <JournalProvider>
             <ReminderProvider>
+              <GoalProvider>
               <FxRateProvider>
                 <FinanceProvider>
                   <TrashProvider>
@@ -163,6 +170,7 @@ export default function RootLayout() {
                   </TrashProvider>
                 </FinanceProvider>
               </FxRateProvider>
+              </GoalProvider>
             </ReminderProvider>
           </JournalProvider>
           </TypographyProvider>

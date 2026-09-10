@@ -5,7 +5,7 @@ import { useI18n } from '@/view/i18n';
 /**
  * Purpose: five-tab shell with a floating glass island instead of a system tab bar.
  * Inputs: Expo Router tab routes.
- * Outputs: tab navigator (Today, Pages, Rhythm, Money, Insights). Settings is href:null; open via `/settings`.
+ * Outputs: tab navigator (Today, Journal, Rhythm, Wallet, Insights). Settings is href:null; open via `/settings`.
  * Side effects: none.
  */
 export default function TabsLayout() {

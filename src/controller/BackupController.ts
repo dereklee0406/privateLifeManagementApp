@@ -1,4 +1,5 @@
 import type { FinanceRepository } from '../model/finance/FinanceRepository';
+import type { GoalRepository } from '../model/goals/GoalRepository';
 import type { JournalRepository } from '../model/journal/JournalRepository';
 import type { ReminderRepository } from '../model/reminders/ReminderRepository';
 import type { SettingsRepository } from '../model/settings/SettingsRepository';
@@ -15,6 +16,7 @@ import {
 import { buildReadableCsv, readableCsvFilename } from '../model/backup/readableExport';
 import { JournalLocalStore } from '../data/JournalLocalStore';
 import { FinanceLocalStore } from '../data/FinanceLocalStore';
+import { GoalsLocalStore } from '../data/GoalsLocalStore';
 import { RemindersLocalStore } from '../data/RemindersLocalStore';
 import { SettingsLocalStore } from '../data/SettingsLocalStore';
 import { ensureCsprng } from '../data/ensureCsprng';
@@ -24,7 +26,7 @@ import { ReminderController } from './ReminderController';
 
 /**
  * Purpose: orchestrate encrypted backup export/import without UI.
- * Inputs: the four repositories plus reminder scheduler for native notification refill.
+ * Inputs: local repositories plus reminder scheduler for native notification refill.
  * Outputs: encrypted file bytes + filename; import writes stores then reschedules pings.
  * Side effects: AsyncStorage replace-all on import; OS notification sync on native.
  * Design decisions: decrypt + validate fully before any write; PIN never loaded from secure-store.
@@ -36,6 +38,7 @@ export class BackupController {
     private readonly finance: FinanceRepository,
     private readonly settings: SettingsRepository,
     private readonly reminderScheduler: Pick<ReminderController, 'syncSchedules'>,
+    private readonly goals: GoalRepository,
   ) {}
 
   /**
@@ -52,17 +55,19 @@ export class BackupController {
     if (!isBackupPasswordValid(password)) {
       throw new BackupError('weak-password');
     }
-    const [journal, reminders, finance, storedSettings] = await Promise.all([
+    const [journal, reminders, finance, storedSettings, goals] = await Promise.all([
       this.journal.loadAll(),
       this.reminders.load(),
       this.finance.load(),
       this.settings.load(),
+      this.goals.loadAll(),
     ]);
     const document = buildBackupDocument({
       journal,
       reminders,
       finance,
       settings: storedSettings ?? DEFAULT_SETTINGS,
+      goals,
     });
     const bytes = await encryptBackupPayload(serializeBackupDocument(document), password);
     return { bytes, filename: backupFilename() };
@@ -101,7 +106,7 @@ export class BackupController {
    * Purpose: replace all local stores with a validated backup document.
    * Inputs: BackupDocument from decryptBackup.
    * Outputs: void.
-   * Side effects: replace journal, reminders, finance, settings JSON; reschedule reminder notifications; never touches secure-store PIN.
+   * Side effects: replace journal, reminders, finance, settings, goals JSON; reschedule reminder notifications; never touches secure-store PIN.
    *   If the backup had lock on but this device has no PIN, lockMode is saved as off so she is not trapped.
    */
   async commitBackup(document: BackupDocument): Promise<void> {
@@ -114,6 +119,7 @@ export class BackupController {
     await this.reminders.save(document.reminders);
     await this.finance.save(document.finance);
     await this.settings.save(settings);
+    await this.goals.saveAll(document.goals);
     await this.reminderScheduler.syncSchedules({
       playSound: resolveReminderSoundEnabled(settings),
       redactLockScreen: settings.lockMode !== 'off',
@@ -147,5 +153,6 @@ export function createBackupController(): BackupController {
     new FinanceLocalStore(),
     new SettingsLocalStore(),
     new ReminderController(reminderStore),
+    new GoalsLocalStore(),
   );
 }

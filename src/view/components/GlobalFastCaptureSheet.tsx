@@ -12,17 +12,13 @@ import { SheetChrome, sheetTopRadius } from './SheetChrome';
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
-type CaptureActionId = 'write' | 'spend' | 'habit' | 'transfer';
+type CaptureActionId = 'write' | 'spend' | 'habit';
 
 interface CaptureAction {
   id: CaptureActionId;
   icon: IoniconName;
-  titleKey: 'capture.write' | 'capture.spend' | 'capture.habit' | 'capture.transfer';
-  descKey:
-    | 'capture.writeDesc'
-    | 'capture.spendDesc'
-    | 'capture.habitDesc'
-    | 'capture.transferDesc';
+  titleKey: 'capture.write' | 'capture.spend' | 'capture.habit';
+  descKey: 'capture.writeDesc' | 'capture.spendDesc' | 'capture.habitDesc';
 }
 
 const ACTIONS: CaptureAction[] = [
@@ -44,12 +40,6 @@ const ACTIONS: CaptureAction[] = [
     titleKey: 'capture.habit',
     descKey: 'capture.habitDesc',
   },
-  {
-    id: 'transfer',
-    icon: 'swap-horizontal-outline',
-    titleKey: 'capture.transfer',
-    descKey: 'capture.transferDesc',
-  },
 ];
 
 interface GlobalFastCaptureSheetProps {
@@ -60,12 +50,12 @@ interface GlobalFastCaptureSheetProps {
 }
 
 /**
- * Purpose: universal Fast Capture hub — four contextual creation paths from Today FAB.
+ * Purpose: universal Fast Capture hub — Write / Spend / Habit from the shared hub FAB.
  * Inputs: visible + onClose; onSelectSpend for Quick Spend handoff (parent owns QuickSpendSheet).
- * Outputs: modal bottom sheet with neumorphic 2×2 action tiles.
- * Side effects: hapticLight on tile press; router.push for write / habit / transfer; onSelectSpend for spend.
- * Design decisions: SheetChrome grabber for iOS page-sheet feel; spend stays in-sheet layer
- *   (no route) so Money’s QuickSpendSheet pattern is reused; tiles use raisedSurface + scale 0.97.
+ * Outputs: modal bottom sheet with three neumorphic tiles.
+ * Side effects: hapticLight on tile press; router.push for write / habit; onSelectSpend for spend.
+ * Design decisions: Transfer is Wallet-only (`/transfer/new`), not a capture tile. Spend stays
+ *   in-sheet layer (no route) so QuickSpendSheet is reused; tiles use raisedSurface + scale 0.97.
  */
 export function GlobalFastCaptureSheet({
   visible,
@@ -89,11 +79,7 @@ export function GlobalFastCaptureSheet({
       router.push('/compose?mode=text');
       return;
     }
-    if (id === 'habit') {
-      router.push(appHref('/reminders/new'));
-      return;
-    }
-    router.push('/transfer/new');
+    router.push(appHref('/reminders/new'));
   };
 
   return (

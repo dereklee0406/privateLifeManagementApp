@@ -274,6 +274,12 @@ export function SettingsScreen() {
 
         <GroupedSection header={t('you.more')} icon="shield-checkmark-outline">
           <GroupedRow
+            title={t('you.photos')}
+            subtitle={t('photos.lede')}
+            onPress={() => router.push(appHref('/memories'))}
+            chevron
+          />
+          <GroupedRow
             title={t('you.privacy')}
             subtitle={t('you.privacyHint')}
             onPress={() => router.push(appHref('/privacy'))}
