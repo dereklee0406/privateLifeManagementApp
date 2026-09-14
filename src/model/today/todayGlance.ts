@@ -38,7 +38,7 @@ export interface UpcomingBillGlance {
  * Inputs: journal entries and now.
  * Outputs: latest today’s mood line, or null when she has not written yet.
  * Side effects: none.
- * Design decisions: last page of the day wins; Neutral still counts as “already wrote.”
+ * Design decisions: last page of the day wins; Steady (neutral) still counts as “already wrote.”
  */
 export function todaysMoodLine(entries: JournalEntry[], now: Date = new Date()): TodayMoodLine | null {
   const todayKey = toDayKey(now);

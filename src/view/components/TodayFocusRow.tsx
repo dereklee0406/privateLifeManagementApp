@@ -12,11 +12,11 @@ import { fonts, groupedRadius } from '../theme/tokens';
 import { GlassSurface } from './GlassSurface';
 
 /**
- * Purpose: compact Today row for the single active Goal — the one-glance goal.
+ * Purpose: compact Today row for the single active Goal — Current Mission.
  * Inputs: GoalProvider list; pickFocusGoal + goalProgress in Model.
- * Outputs: one thin Focus row under Next Up, or nothing when no active Goal.
- * Side effects: navigates to Rhythm Focus.
- * Design decisions: hidden when empty so Today stays score + Next Up; tap opens Focus, not a fat card.
+ * Outputs: one thin Mission row under Next Up, or nothing when no active Goal.
+ * Side effects: navigates to Focus (Rhythm route folder).
+ * Design decisions: hidden when empty so Today stays score + Next Up + Mission; one active goal.
  */
 export function TodayFocusRow() {
   const colors = useThemeColors();
@@ -83,10 +83,10 @@ export function TodayFocusRow() {
 
 const styles = StyleSheet.create({
   card: {
-    paddingVertical: 12,
+    paddingVertical: 10,
     paddingHorizontal: 14,
     gap: 8,
-    marginBottom: 14,
+    marginBottom: 12,
   },
   row: {
     flexDirection: 'row',

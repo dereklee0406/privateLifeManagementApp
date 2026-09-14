@@ -46,15 +46,15 @@ export interface MoodAnalysis {
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 const CLIMATE_LABEL: Record<MoodClimate, string> = {
-  happy: 'Happy',
-  neutral: 'Neutral',
-  stress: 'Stress',
+  happy: 'Good',
+  neutral: 'Steady',
+  stress: 'Rough',
 };
 
 /**
- * Purpose: map a journal mood onto the Happy / Neutral / Stress climate used on Aura.
+ * Purpose: map a journal mood onto the three-bucket climate used by leftover Aura charts.
  * Inputs: MoodId.
- * Outputs: climate bucket. 😊 → Happy, 😐 → Neutral, 😔 and 😡 → Stress.
+ * Outputs: climate bucket. Good → happy, Steady → neutral, Off + Rough → stress.
  * Side effects: none.
  */
 export function moodToClimate(mood: MoodId): MoodClimate {
@@ -77,7 +77,7 @@ function inWindow(createdAt: string, windowStart: number, windowEnd: number): bo
 }
 
 /**
- * Purpose: Happy / Neutral / Stress share of entries in the last 30 local days.
+ * Purpose: Good / Steady / Rough share of entries in the last 30 local days.
  * Inputs: entries and optional now.
  * Outputs: counts and whole-number percents. Empty shares when there are no entries in the window (never fake numbers).
  * Side effects: none.
@@ -139,7 +139,7 @@ export function computeDailyMoodSeries(
 }
 
 /**
- * Purpose: Happy / Neutral / Stress counts by local week for recent weeks.
+ * Purpose: Good / Steady / Rough counts by local week for recent weeks.
  * Inputs: entries, now, week count (newest week last), weekStartsOn (same as Calendar / This week).
  * Outputs: stacked-bar series.
  * Side effects: none.
@@ -176,7 +176,7 @@ export function computeWeeklyTrend(
 }
 
 /**
- * Purpose: Happy / Neutral / Stress counts by calendar month for recent months.
+ * Purpose: Good / Steady / Rough counts by calendar month for recent months.
  * Inputs: entries, now, month count (newest last).
  * Outputs: stacked-bar series.
  * Side effects: none.

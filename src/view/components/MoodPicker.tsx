@@ -12,10 +12,11 @@ interface MoodPickerProps {
 }
 
 /**
- * Purpose: let the writer choose one of four emoji moods for a page.
+ * Purpose: let the writer choose one of four moods for a page.
  * Inputs: selected mood and change handler.
- * Outputs: horizontal emoji row with localized labels.
+ * Outputs: horizontal emoji row with Good / Steady / Off / Rough labels (i18n mood.*).
  * Side effects: light haptic on selection.
+ * Design decisions: ids stay happy|neutral|sad|angry; labels never paint Happy/Neutral/Sad/Angry.
  */
 export function MoodPicker({ value, onChange }: MoodPickerProps) {
   const colors = useThemeColors();

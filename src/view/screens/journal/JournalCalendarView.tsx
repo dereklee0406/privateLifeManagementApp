@@ -44,7 +44,7 @@ const DOT_HABIT = '#34C759';
  *   light haptic on day select / jump-to-today; success haptic on habit check-in.
  * Design decisions: three distinct mini-dots synthesize life activity at a glance;
  *   day drawer uses sectioned cards (stories / habits / spends) instead of a flat list;
- *   extracted from CalendarScreen month mode so Journal owns date browsing.
+ *   Journal owns date browsing (Focus is Due / Streaks / Focus).
  */
 export function JournalCalendarView() {
   const colors = useThemeColors();

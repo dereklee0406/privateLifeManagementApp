@@ -50,7 +50,14 @@ export function SearchFilters({ value, onChange }: SearchFiltersProps) {
         {MOODS.map((mood) => {
           const selected = value.mood === mood.id;
           return (
-            <Pressable key={mood.id} onPress={() => toggleMood(mood.id)} style={[chipSurface(colors, selected), styles.chip]}>
+            <Pressable
+              key={mood.id}
+              onPress={() => toggleMood(mood.id)}
+              accessibilityRole="button"
+              accessibilityState={{ selected }}
+              accessibilityLabel={t(`mood.${mood.id}`)}
+              style={[chipSurface(colors, selected), styles.chip]}
+            >
               <Text style={styles.chipEmoji}>{mood.emoji}</Text>
             </Pressable>
           );

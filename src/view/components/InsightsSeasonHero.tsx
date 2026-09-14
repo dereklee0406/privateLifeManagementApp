@@ -12,12 +12,13 @@ const PILLAR_KEY: Record<SeasonPillarId, string> = {
 };
 
 /**
- * Purpose: Insights Season hero — rank mark, composite meter, present pillars only.
+ * Purpose: Insights Season hero — rank mark, circular score well, present pillar bars.
  * Inputs: SeasonRank from Model; optional month hint.
  * Outputs: one raised board-pack header (presentation only).
  * Side effects: none.
  * Design decisions: missing habit/budget pillars are omitted, never greyed-in at 50%.
- *   Score is 0–100 tabular. Meter is an inset clay well, not an XP bar.
+ *   Score is 0–100 tabular in a circular clay well (chart-like meter, not XP). Pillar bars
+ *   stay View fills. Static for Reduce Motion.
  */
 export function InsightsSeasonHero({
   season,
@@ -40,13 +41,17 @@ export function InsightsSeasonHero({
         accessibilityLabel={t('insights.heroA11y', { rank: rankLabel, score })}
         style={styles.heroInner}
       >
-        <Text style={[styles.kicker, { color: colors.accent }]}>{t('season.label')}</Text>
-        <View style={styles.rankRow}>
-          <Text style={[styles.rank, { color: colors.ink }]}>{rankLabel}</Text>
-          <Text style={[styles.score, { color: colors.ink }]}>{score}</Text>
-        </View>
-        <View style={[insetSurface(colors, 8), styles.meterTrack]} accessibilityElementsHidden>
-          <View style={[styles.meterFill, { width: `${Math.max(4, score)}%`, backgroundColor: colors.accent }]} />
+        <View style={styles.scoreRow}>
+          <View style={[insetSurface(colors, 48), styles.scoreWell]}>
+            <Text style={[styles.score, { color: colors.ink }]}>{score}</Text>
+          </View>
+          <View style={styles.scoreCopy}>
+            <Text style={[styles.kicker, { color: colors.accent }]}>{t('season.label')}</Text>
+            <Text style={[styles.rank, { color: colors.ink }]}>{rankLabel}</Text>
+            <View style={[insetSurface(colors, 8), styles.meterTrack]} accessibilityElementsHidden>
+              <View style={[styles.meterFill, { width: `${Math.max(4, score)}%`, backgroundColor: colors.accent }]} />
+            </View>
+          </View>
         </View>
         <View style={styles.pillars}>
           {pillars.map((pillar) => {
@@ -79,7 +84,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   heroInner: {
-    gap: 12,
+    gap: 14,
+  },
+  scoreRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  scoreWell: {
+    width: 88,
+    height: 88,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  scoreCopy: {
+    flex: 1,
+    minWidth: 0,
+    gap: 8,
   },
   kicker: {
     fontFamily: fonts.bodySemi,
@@ -87,19 +108,11 @@ const styles = StyleSheet.create({
     letterSpacing: 1.4,
     textTransform: 'uppercase',
   },
-  rankRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
   rank: {
     fontFamily: fonts.display,
-    fontSize: 34,
-    lineHeight: 40,
+    fontSize: 28,
+    lineHeight: 34,
     fontWeight: '700',
-    flex: 1,
-    minWidth: 0,
   },
   score: {
     fontFamily: fonts.display,
@@ -109,7 +122,7 @@ const styles = StyleSheet.create({
     fontVariant: ['tabular-nums'],
   },
   meterTrack: {
-    height: 8,
+    height: 10,
     overflow: 'hidden',
   },
   meterFill: {

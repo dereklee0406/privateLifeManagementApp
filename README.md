@@ -8,11 +8,11 @@
 [![Privacy](https://img.shields.io/badge/Privacy-100%25%20On--Device-success.svg)](#privacy-first-guarantee)
 [![Tests](https://img.shields.io/badge/Tests-Node%20Test%20Runner-brightgreen.svg)](#automated-testing)
 
-A private on-device life + money companion for one person. Open it, write a page, set a reminder, optimize your credit card rewards, or log an expense — then you’re done. 
+A private on-device life + money companion for one person. Open it, write a page, set a reminder, optimize your credit card rewards, or log an expense — then you’re done.
 
-Built with soft tactile neumorphism (raised cards, inset wells, clay buttons, floating tab pills); Fraunces + Outfit typography. **No cloud account, no sharing, no bank login, no tracking.** Everything stays on your phone.
+Built with soft tactile neumorphism (raised cards, inset wells, clay buttons, iOS-style tab bar). **System UI** typography (San Francisco / Roboto / `system-ui` — Fraunces and Outfit are retired). **No cloud account, no sharing, no bank login, no tracking.** Everything stays on your phone.
 
-Product contract: **[FUNCTIONAL_SPEC.md](./FUNCTIONAL_SPEC.md)**.
+Product contract: **[FUNCTIONAL_SPEC.md](./FUNCTIONAL_SPEC.md)**. Clay chrome: **[UI_DESIGN.md](./UI_DESIGN.md)**.
 
 ---
 
@@ -29,19 +29,19 @@ Product contract: **[FUNCTIONAL_SPEC.md](./FUNCTIONAL_SPEC.md)**.
 - **Compact 3×4 Calculator**: Screen-efficient keypad with tap-to-expand amount hero, arithmetic operators, and currency conversion.
 - **Quick Spend Sheet**: 1-tap modal featuring smart suggestions, recent spend history chips, one-tap templates (Coffee, Lunch, Commute), and voice quick add.
 - **On-Device Receipt Photo OCR**: Capture receipt photos or attach invoices to automatically recognize text and populate merchant, total, and items into expense descriptions—100% on-device without cloud transmission.
-- **Foreign Exchange Locking**: Real-time currency conversion (HKD / USD / CNY / EUR / GBP / JPY) with foreign transaction fee calculation, locking the home currency estimate at transaction time.
+- **Foreign Exchange Locking**: Latest-rate conversion (HKD / USD / CNY) plus card fee %, locking the home-currency estimate at save. EUR / GBP / JPY are not in the keypad.
 
 ### 🤝 Fair Bill Splitting & Account Transfers
 - **Split Expense Flow**: Equal mode with **largest-remainder cent distribution** (e.g. $100 split 3 ways is $33.34, $33.33, $33.33) or custom allocation, complete with settlement status tracking.
 - **Account Transfers & Credit Card Repayments**: Transfer funds between cash, bank accounts, and loans, or make credit card repayments with live balance updates.
 
 ### 📖 Journal & Daily Reflections
-- **Rich Daily Entries**: Markdown formatting, 4-tier mood ratings (😊 Neutral, Happy, Low, Stressed), mood notes, hashtags, and voice clips.
-- **Photo Memories Reel**: Private full-screen reel of journal photos grouped by month and year.
+- **Rich Daily Entries**: Markdown formatting, 4-tier mood (Good / Steady / Off / Rough; ids `happy|neutral|sad|angry`), mood notes, hashtags, and voice clips.
+- **Photo Memories Reel**: Private full-screen reel of journal photos grouped by month and year — Journal → Memories, and Settings → Photos.
 
 ### ⏰ Reminders & Habit Loops
 - **Flexible Recurrence**: Daily, weekday-only, weekly, and calendar-clamped monthly schedules (e.g. month-end or specific days).
-- **1-Tap Fast Loops**: Today recurring strip and Next Up action card on Home for single-tap completion.
+- **Today is one glance**: Life Score, Next Up (1-tap complete), one Mission, optional 3-line Summary — not a Write/Record/Spend capsule or a recurring strip. Due chips live on Wallet; capture is the FAB (Thought / Expense / Habit).
 
 ### 🔒 Security, Trust & Offline Integrity
 - **App Lock**: Biometric authentication (Face ID / Touch ID / Fingerprint) and PIN lock with customizable auto-lock timeouts (Immediate, 1 min, 5 min).
@@ -70,7 +70,7 @@ Halo adheres to a strict **Model-View-Controller (MVC)** architecture:
 ┌─────────────────────────────────────────────────────────────┐
 │                   Controller Layer (State)                  │
 │   FinanceProvider · JournalProvider · ReminderProvider      │
-│   SettingsProvider · LockProvider · FxRateProvider          │
+│   GoalProvider · SettingsProvider · LockProvider · FxRateProvider │
 └──────────────────────────────┬──────────────────────────────┘
                                │ Dispatches pure domain logic
                                ▼
@@ -99,7 +99,7 @@ Halo adheres to a strict **Model-View-Controller (MVC)** architecture:
 ```
 privateLifeManagementApp/
 ├── app/                        # Expo Router file-based routes
-│   ├── (tabs)/                 # Main tabs: Today, Pages, Calendar, Money, You
+│   ├── (tabs)/                 # Main tabs: Today, Journal, Rhythm, Wallet, Insights (Settings via cog)
 │   ├── compose.tsx             # Journal entry creation
 │   ├── spend/                  # Expense logging & edit modal
 │   ├── transfer/               # Account transfer & card repayment modal
@@ -110,10 +110,13 @@ privateLifeManagementApp/
 │   ├── data/                   # Storage adapters (AsyncStorage, mediaStore, backupIO)
 │   ├── model/                  # MVC Domain Models & Pure Engines
 │   │   ├── backup/             # PBKDF2/AES-GCM encryption & serialization
-│   │   ├── finance/            # Expense, rebates, split, FX, transfers
+│   │   ├── finance/            # Expense, rebates, split, FX, transfers, Worth
+│   │   ├── goals/              # Goal rows + derived progress
+│   │   ├── insights/           # Board facts, predictions, month share
 │   │   ├── journal/            # Journal entries, photo memories, search
 │   │   ├── ocr/                # Receipt parsing & on-device OCR engines
 │   │   ├── reminders/          # Reminders, recurring rules, card accounts
+│   │   ├── season/             # Derived Spark→Steel rank (not stored)
 │   │   └── settings/           # App settings & language resolution
 │   ├── utils/                  # Haptics, dates, formatting, navigation
 │   └── view/                   # MVC Views & UI Components

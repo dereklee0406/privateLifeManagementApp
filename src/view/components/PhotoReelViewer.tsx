@@ -36,7 +36,7 @@ const VIEWABILITY = { itemVisiblePercentThreshold: 60 };
 /**
  * Purpose: one-line reel caption from the page date, mood, and optional mood note.
  * Inputs: photo memory, Intl locale, translated mood label.
- * Outputs: e.g. "Sep 8, 2026 · 😊 Happy" or with her mood note.
+ * Outputs: e.g. "Sep 8, 2026 · 😊 Good" or with a mood note.
  * Side effects: none.
  * Design decisions: date first; every page has a mood so it always shows; a note replaces the generic label.
  */

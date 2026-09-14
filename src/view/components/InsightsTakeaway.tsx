@@ -13,7 +13,8 @@ import { fonts } from '../theme/tokens';
  * Outputs: large tappable paragraph (44pt hit).
  * Side effects: haptic + navigation.
  * Design decisions: no equal-weight GlassSurface. Hierarchy is type size + accent kicker.
- *   Share card still uses insights.pressureLabel; this screen uses takeawayLabel.
+ *   Share card still uses insights.pressureLabel; this screen uses takeawayLabel. Insights
+ *   charts sit below — this line is the Life OS verdict, not a Bloomberg caption.
  */
 export function InsightsTakeaway({ line, href }: { line: string; href: string }) {
   const colors = useThemeColors();

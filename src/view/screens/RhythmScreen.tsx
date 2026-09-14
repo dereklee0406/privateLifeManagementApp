@@ -20,7 +20,7 @@ import { RhythmTasksPanel } from './rhythm/RhythmTasksPanel';
 export type RhythmSegment = 'tasks' | 'streaks' | 'focus';
 
 /**
- * Purpose: Tab 3 Habits & Rhythm hub — Due, Streaks, and Focus (Goals).
+ * Purpose: Tab 3 Focus hub — Due, Streaks, and Focus (Goals). Route folder stays `calendar`.
  * Inputs: optional `tab` search param (`tasks` | `streaks` | `focus`) for deep links from `/habits` and Today.
  * Outputs: editorial header, HubSegmentControl, active panel only.
  * Side effects: navigation to create reminder; segment haptic via HubSegmentControl.
@@ -81,7 +81,7 @@ export function RhythmScreen({
                 {t('rhythm.headerKicker')}
               </Text>
             ) : null}
-            <LargeTitle title={t('rhythm.headerTitle')} />
+            <LargeTitle title={t('tabs.focus')} />
           </View>
           <Pressable
             onPress={() => {

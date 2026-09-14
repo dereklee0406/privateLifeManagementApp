@@ -16,6 +16,7 @@ import { LargeTitle } from '../components/LargeTitle';
 import { ScreenScaffold } from '../components/ScreenScaffold';
 import { TodayFocusRow } from '../components/TodayFocusRow';
 import { TodaySeasonHero } from '../components/TodaySeasonHero';
+import { TodaySummaryBlock } from '../components/TodaySummaryBlock';
 import { useThemeColors } from '../theme/ThemeProvider';
 import { fonts, groupedRadius, raisedSurface } from '../theme/tokens';
 import { tabScenePaddingBottom, type } from '../theme/typography';
@@ -23,15 +24,14 @@ import { reminderTypeTextProps, reminderTypeTextStyle } from '../components/scal
 import { greetingKeyForHour, useI18n, localizeNextUpBadge } from '../i18n';
 
 /**
- * Purpose: Today one-glance command — one Season score, one Next Up, one Focus goal.
- * Inputs: reminders, settings (name + currency); Season/Focus fetch their own providers.
- * Outputs: compact date + greeting, Season hero, Next Up (or add-reminder CTA), Focus if active.
+ * Purpose: Today one-glance command — Life Score, Next Up, Mission, AI Summary.
+ * Inputs: reminders, settings (name + currency); Season / Mission / Summary fetch their own providers.
+ * Outputs: compact date + greeting, four above-the-fold blocks, FAB.
  * Side effects: navigates to Journal search, settings, Next Up href, or new reminder;
  *   1-tap completeReminder on Next Up when itemType is reminder;
- *   shared HubCaptureFab opens Write / Spend / Habit.
- * Design decisions: subtract-first. Streak, prediction, mood, week chips, photos, on-this-day,
- *   reflection cue, and the recurring strip leave this screen so the three primitives fit one
- *   phone fold. Season math stays in computeSeasonRank. No 5-button action row. No Focus Session.
+ *   shared HubCaptureFab opens Thought / Expense / Habit.
+ * Design decisions: subtract-first. Four blocks only: Life Score, Next Up, Current Mission,
+ *   AI Summary (omit if empty). FAB stays. No widget wall.
  */
 export function HomeScreen() {
   const colors = useThemeColors();
@@ -196,6 +196,7 @@ export function HomeScreen() {
         )}
 
         <TodayFocusRow />
+        <TodaySummaryBlock />
       </ScrollView>
 
       <HubCaptureFab />
@@ -239,9 +240,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   weekCard: {
-    padding: 18,
-    gap: 10,
-    marginBottom: 14,
+    padding: 16,
+    gap: 8,
+    marginBottom: 12,
   },
   stripLabel: {
     fontFamily: fonts.bodySemi,

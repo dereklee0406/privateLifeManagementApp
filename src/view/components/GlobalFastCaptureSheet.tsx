@@ -50,7 +50,7 @@ interface GlobalFastCaptureSheetProps {
 }
 
 /**
- * Purpose: universal Fast Capture hub — Write / Spend / Habit from the shared hub FAB.
+ * Purpose: universal Fast Capture hub — Thought / Expense / Habit from the shared hub FAB.
  * Inputs: visible + onClose; onSelectSpend for Quick Spend handoff (parent owns QuickSpendSheet).
  * Outputs: modal bottom sheet with three neumorphic tiles.
  * Side effects: hapticLight on tile press; router.push for write / habit; onSelectSpend for spend.

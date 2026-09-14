@@ -3,7 +3,9 @@
  * Inputs: none.
  * Outputs: MoodId union, MoodDefinition, and the catalog used by UI and stats.
  * Side effects: none.
- * Design decisions: four emoji moods replace the earlier six-orb catalog. Ids stay English so storage is stable; emoji is presentation.
+ * Design decisions: four moods. Ids stay happy|neutral|sad|angry so storage is stable.
+ *   UI language is Good / Steady / Off / Rough (i18n `mood.*`). English labels here are
+ *   fallbacks only. Prompts are field-notebook, not spa.
  */
 export type MoodId = 'happy' | 'neutral' | 'sad' | 'angry';
 
@@ -15,10 +17,10 @@ export interface MoodDefinition {
 }
 
 export const MOODS: readonly MoodDefinition[] = [
-  { id: 'happy', label: 'Happy', emoji: '😊', prompt: 'What felt bright today?' },
-  { id: 'neutral', label: 'Neutral', emoji: '😐', prompt: 'What sat in the middle of the day?' },
-  { id: 'sad', label: 'Sad', emoji: '😔', prompt: 'What asked to be held gently?' },
-  { id: 'angry', label: 'Angry', emoji: '😡', prompt: 'What heat moved through you?' },
+  { id: 'happy', label: 'Good', emoji: '😊', prompt: 'What went well?' },
+  { id: 'neutral', label: 'Steady', emoji: '😐', prompt: 'What held?' },
+  { id: 'sad', label: 'Off', emoji: '😔', prompt: 'What was off?' },
+  { id: 'angry', label: 'Rough', emoji: '😡', prompt: 'What was rough?' },
 ] as const;
 
 const LEGACY_MOOD_MAP: Record<string, MoodId> = {
@@ -33,7 +35,7 @@ const LEGACY_MOOD_MAP: Record<string, MoodId> = {
 /**
  * Purpose: look up a mood definition by id with a safe fallback.
  * Inputs: mood id, possibly unknown from older stored data.
- * Outputs: matching MoodDefinition, or Neutral when unknown.
+ * Outputs: matching MoodDefinition, or Steady (neutral) when unknown.
  * Side effects: none.
  */
 export function getMoodDefinition(moodId: string): MoodDefinition {
@@ -42,7 +44,7 @@ export function getMoodDefinition(moodId: string): MoodDefinition {
 }
 
 /**
- * Purpose: coerce stored or legacy mood ids onto the four-emoji catalog.
+ * Purpose: coerce stored or legacy mood ids onto the four-mood catalog.
  * Inputs: any string from storage or drafts.
  * Outputs: a valid MoodId.
  * Side effects: none.

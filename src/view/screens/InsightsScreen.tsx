@@ -8,25 +8,26 @@ import { useJournal } from '../../controller/JournalProvider';
 import { useReminders } from '../../controller/ReminderProvider';
 import { useSettings } from '../../controller/SettingsProvider';
 import { computeMonthlyBoardFacts, computeWeeklyBoardFacts } from '../../model/insights/boardFacts';
+import { hrefForPressure } from '../../model/insights/insightsBrief';
 import { computeMonthlyInsightsReport } from '../../model/insights/monthlyReport';
 import { buildMonthlyShareFacts } from '../../model/insights/monthlyShare';
-import type { InsightsPressure } from '../../model/insights/pressure';
 import { pickTodayPrediction } from '../../model/insights/predictions';
 import { computeWeeklyInsightsReport } from '../../model/insights/weeklyReport';
-import { computeSeasonRank } from '../../model/season/seasonRank';
+import { computeSeasonRank, computeSeasonTrend } from '../../model/season/seasonRank';
+import { buildSeasonShareFacts } from '../../model/season/seasonShare';
 import { resolveWeekStart } from '../../model/settings/AppSettings';
 import { nextUpCard } from '../../model/today/nextUp';
 import { appHref } from '../../utils/navigation';
 import { hapticLight } from '../../utils/haptics';
 import { HubCaptureFab } from '../components/HubCaptureFab';
 import { HubSegmentControl, type HubSegmentOption } from '../components/HubSegmentControl';
-import { InsightsGlanceGrid } from '../components/InsightsGlanceGrid';
+import { InsightsMonthCharts, InsightsWeekCharts } from '../components/InsightsCharts';
 import { InsightsSeasonHero } from '../components/InsightsSeasonHero';
 import { InsightsTakeaway } from '../components/InsightsTakeaway';
-import { InsightsMonthPace, InsightsWeekStrip } from '../components/InsightsWeekStrip';
 import { LargeTitle } from '../components/LargeTitle';
 import { MonthlyReportShareButton } from '../components/MonthlyReportShareButton';
 import { ScreenScaffold } from '../components/ScreenScaffold';
+import { SeasonShareButton } from '../components/SeasonShareButton';
 import { TodayPredictionLine } from '../components/TodayPredictionLine';
 import { localizeMonthlyInsights, localizeWeeklyInsights, useI18n } from '../i18n';
 import { useThemeColors } from '../theme/ThemeProvider';
@@ -50,38 +51,13 @@ function parseInsightsSegment(raw: string | string[] | undefined): InsightsSegme
 }
 
 /**
- * Purpose: deep-link path for a pressure kind (synthesis, not a reprinted list).
- * Inputs: pressure id.
- * Outputs: in-app href.
- * Side effects: none.
- */
-function hrefForPressure(pressure: InsightsPressure): string {
-  if (pressure === 'overdue') {
-    return '/(tabs)/calendar?tab=tasks';
-  }
-  if (pressure === 'habits') {
-    return '/(tabs)/calendar?tab=streaks';
-  }
-  if (pressure === 'budget' || pressure === 'spendUp') {
-    return '/(tabs)/money?segment=cashflow';
-  }
-  if (pressure === 'worth') {
-    return '/(tabs)/money?segment=worth';
-  }
-  if (pressure === 'writing' || pressure === 'quiet') {
-    return '/(tabs)/journal';
-  }
-  return '/(tabs)';
-}
-
-/**
- * Purpose: Tab 5 Insights — This week | This month board pack + deep links.
+ * Purpose: Tab 5 Insights — This week | This month as data viz, one-line takeaway.
  * Inputs: journal / reminders / finance / settings; optional `segment` query.
- * Outputs: header, settings cog, two segments, Season hero, glance tiles, takeaway, share (month).
+ * Outputs: header, settings cog, two segments, takeaway, Season meter, View charts.
  * Side effects: navigates to Settings or hub deep links; segment haptic via HubSegmentControl.
- * Design decisions: math stays in Model. One visual hero, then tiles, then texture, then the
- *   take. No reprint of Rhythm streak lists or Wallet category rows. Close-the-day is skipped
- *   so Today stays a 30s loop. HubCaptureFab stays.
+ * Design decisions: series math stays in Model. Charts are primary (writing / habit / spend /
+ *   mood / Worth spark). Takeaway is the verdict. Share Season uses the month-card capture path.
+ *   No MoodTrendCharts dump. No reprint of Focus streak lists or Wallet category rows.
  */
 export function InsightsScreen() {
   const colors = useThemeColors();
@@ -153,7 +129,7 @@ export function InsightsScreen() {
 
         <HubSegmentControl options={segmentOptions} value={segment} onChange={setSegment} />
 
-        {segment === 'week' ? <WeekPanel /> : <MonthPanel />}
+        {segment === 'week' ? <WeekChartsPanel /> : <MonthChartsPanel />}
       </ScrollView>
       <HubCaptureFab />
     </ScreenScaffold>
@@ -161,13 +137,13 @@ export function InsightsScreen() {
 }
 
 /**
- * Purpose: This week board pack — Season hero, glance tiles, week strip, takeaway, prediction echo.
+ * Purpose: This week board pack — one-line takeaway, then Season meter and View charts.
  * Inputs: providers; weekly report + board facts + Season in Model.
  * Outputs: presentation only.
- * Side effects: deep-link navigation from child tiles.
+ * Side effects: deep-link navigation from child charts.
+ * Design decisions: takeaway is the verdict. Share Season sits under the hero.
  */
-function WeekPanel() {
-  const colors = useThemeColors();
+export function WeekChartsPanel() {
   const { t } = useI18n();
   const { entries } = useJournal();
   const { reminders, creditCards } = useReminders();
@@ -220,30 +196,36 @@ function WeekPanel() {
 
   return (
     <View style={styles.panelStack}>
-      <Text style={[type.subhead, styles.lede, { color: colors.muted }]}>{t('insights.weekLede')}</Text>
-      <InsightsSeasonHero season={season} />
+      <InsightsTakeaway line={copy.pressureLine} href={hrefForPressure(report.pressure)} />
       {prediction ? <TodayPredictionLine prediction={prediction} /> : null}
-      <InsightsGlanceGrid tiles={board.tiles} />
-      <InsightsWeekStrip cells={board.strip} />
+      <InsightsSeasonHero season={season.rankSnapshot} />
+      <SeasonShareButton facts={season.shareFacts} />
+      <InsightsWeekCharts
+        strip={board.strip}
+        spendCompare={board.spendCompare}
+        habitMeter={board.habitMeter}
+        moodClimate={board.moodClimate}
+        spendTile={board.tiles.find((tile) => tile.id === 'spend')}
+        pagesCaption={copy.pagesLine}
+      />
       {board.sparse ? (
         <SparseInvites
           note={t('insights.emptyWeek')}
           showWorth={false}
         />
       ) : null}
-      <InsightsTakeaway line={copy.pressureLine} href={hrefForPressure(report.pressure)} />
     </View>
   );
 }
 
 /**
- * Purpose: This month board pack — Season hero, glance tiles, pace, takeaway, share card.
+ * Purpose: This month board pack — one-line takeaway, then Season / charts / share.
  * Inputs: providers; monthly report + board facts + Season in Model.
  * Outputs: presentation only.
- * Side effects: deep-link navigation from child tiles; share via MonthlyReportShareButton.
+ * Side effects: deep-link navigation from child charts; share via MonthlyReportShareButton.
+ * Design decisions: takeaway is the verdict. Brief builders stay off this View.
  */
-function MonthPanel() {
-  const colors = useThemeColors();
+export function MonthChartsPanel() {
   const { t } = useI18n();
   const { entries } = useJournal();
   const { reminders } = useReminders();
@@ -267,33 +249,42 @@ function MonthPanel() {
     [entries, expenses, reminders, budgets, netWorthHistory, settings.defaultCurrency, now],
   );
   const board = useMemo(
-    () => computeMonthlyBoardFacts(report, entries, reminders, now),
-    [report, entries, reminders, now],
+    () => computeMonthlyBoardFacts(report, entries, reminders, now, netWorthHistory),
+    [report, entries, reminders, now, netWorthHistory],
   );
   const copy = useMemo(() => localizeMonthlyInsights(t, report), [t, report]);
   const season = useSeason(now);
   const shareFacts = useMemo(
-    () => buildMonthlyShareFacts(report, season.rank, now),
-    [report, season.rank, now],
+    () => buildMonthlyShareFacts(report, season.rankSnapshot.rank, now),
+    [report, season.rankSnapshot.rank, now],
   );
 
   return (
     <View style={styles.panelStack}>
-      <Text style={[type.subhead, styles.lede, { color: colors.muted }]}>{t('insights.monthLede')}</Text>
-      <InsightsSeasonHero season={season} hint />
-      <InsightsGlanceGrid tiles={board.tiles} />
-      <InsightsMonthPace pace={board.pace} />
-      {board.sparse ? <SparseInvites note={t('insights.emptyMonth')} showWorth /> : null}
       <InsightsTakeaway line={copy.pressureLine} href={hrefForPressure(report.pressure)} />
+      <InsightsSeasonHero season={season.rankSnapshot} hint />
+      <SeasonShareButton facts={season.shareFacts} />
+      <InsightsMonthCharts
+        writingBars={board.writingBars}
+        pace={board.pace}
+        spendCompare={board.spendCompare}
+        habitMeter={board.habitMeter}
+        moodClimate={board.moodClimate}
+        worthSpark={board.worthSpark}
+        spendTile={board.tiles.find((tile) => tile.id === 'spend')}
+        worthTile={board.tiles.find((tile) => tile.id === 'worth')}
+        pagesCaption={copy.pagesLine}
+      />
+      {board.sparse ? <SparseInvites note={t('insights.emptyMonth')} showWorth /> : null}
       <MonthlyReportShareButton facts={shareFacts} />
     </View>
   );
 }
 
 /**
- * Purpose: derive Season for Insights hero (same Model as Today).
+ * Purpose: derive Season + share facts for Insights hero (same Model as Today).
  * Inputs: now (caller-frozen).
- * Outputs: SeasonRank.
+ * Outputs: SeasonRank, week trend, SeasonShareFacts.
  * Side effects: none.
  */
 function useSeason(now: Date) {
@@ -301,10 +292,16 @@ function useSeason(now: Date) {
   const { reminders } = useReminders();
   const { expenses, budgets } = useFinance();
   const { settings } = useSettings();
-  return useMemo(
+  const rankSnapshot = useMemo(
     () => computeSeasonRank(entries, reminders, budgets, expenses, settings.defaultCurrency, now),
     [entries, reminders, budgets, expenses, settings.defaultCurrency, now],
   );
+  const trend = useMemo(
+    () => computeSeasonTrend(entries, reminders, budgets, expenses, settings.defaultCurrency, now),
+    [entries, reminders, budgets, expenses, settings.defaultCurrency, now],
+  );
+  const shareFacts = useMemo(() => buildSeasonShareFacts(rankSnapshot, trend), [rankSnapshot, trend]);
+  return { rankSnapshot, shareFacts };
 }
 
 /**

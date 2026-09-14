@@ -18,7 +18,7 @@ type OnboardingStep = 1 | 2 | 3;
 const HUB_MAP: Array<{ icon: TypeIconName; titleKey: string; lineKey: string }> = [
   { icon: 'home-outline', titleKey: 'onboarding.hubToday', lineKey: 'onboarding.hubTodayLine' },
   { icon: 'book-outline', titleKey: 'onboarding.hubJournal', lineKey: 'onboarding.hubJournalLine' },
-  { icon: 'checkbox-outline', titleKey: 'onboarding.hubRhythm', lineKey: 'onboarding.hubRhythmLine' },
+  { icon: 'checkbox-outline', titleKey: 'onboarding.hubFocus', lineKey: 'onboarding.hubFocusLine' },
   { icon: 'card-outline', titleKey: 'onboarding.hubWallet', lineKey: 'onboarding.hubWalletLine' },
   { icon: 'pie-chart-outline', titleKey: 'onboarding.hubInsights', lineKey: 'onboarding.hubInsightsLine' },
 ];

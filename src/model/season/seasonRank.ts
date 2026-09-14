@@ -33,6 +33,38 @@ export const SEASON_RANK_TABLE: ReadonlyArray<{ id: SeasonRankId; minScore: numb
 
 export const SEASON_WINDOW_DAYS = 30;
 
+/** Cheap week-over-week window for the Life Score trend (not a second Season engine). */
+export const SEASON_TREND_DAYS = 7;
+
+/**
+ * Purpose: traffic-light status for one present Life Score pillar (not six numbers).
+ * Inputs: pillarStatus().
+ * Outputs: Good / Needs attention / Critical ids for View copy.
+ * Side effects: none.
+ */
+export type PillarStatus = 'good' | 'attention' | 'critical';
+
+/**
+ * Purpose: Life Score week-over-week direction from two 0–1 composites.
+ * Inputs: seasonTrendFromScores.
+ * Outputs: up / down / flat.
+ * Side effects: none.
+ */
+export type SeasonTrendDirection = 'up' | 'down' | 'flat';
+
+/**
+ * Purpose: compact week-over-week Life Score delta for Today.
+ * Inputs: computeSeasonTrend / seasonTrendFromScores.
+ * Outputs: 0–100 scores + signed points. Null when both scores are 0 (nothing to trend).
+ * Side effects: none.
+ */
+export interface SeasonTrend {
+  currentScore: number;
+  previousScore: number;
+  points: number;
+  direction: SeasonTrendDirection;
+}
+
 /**
  * Purpose: derived Season snapshot — never persisted.
  * Inputs: computeSeasonRank.
@@ -64,6 +96,45 @@ export function rankFromScore(score: number): SeasonRankId {
     }
   }
   return 'spark';
+}
+
+/**
+ * Purpose: Life Score points still needed to reach the next Season rank.
+ * Inputs: composite 0–1 score (same as SeasonRank.score).
+ * Outputs: next rank id + whole 0–100 points, or null at Steel (already max).
+ * Side effects: none.
+ * Design decisions: not XP. Floors come from SEASON_RANK_TABLE. Rounding matches the
+ *   0–100 Life Score on Today. If rounding already equals the next floor but rankFromScore
+ *   has not crossed it, show 1 pt so the line never reads “0 pts”.
+ */
+export interface SeasonRankNudge {
+  nextRank: SeasonRankId;
+  points: number;
+}
+
+/**
+ * Purpose: compute the next-rank nudge from a 0–1 Season composite.
+ * Inputs: finite score (clamped).
+ * Outputs: SeasonRankNudge, or null at Steel.
+ * Side effects: none.
+ */
+export function pointsToNextRank(score: number): SeasonRankNudge | null {
+  const clamped = clamp01(score);
+  const current = rankFromScore(clamped);
+  if (current === 'steel') {
+    return null;
+  }
+  const currentIndex = SEASON_RANK_TABLE.findIndex((row) => row.id === current);
+  const next = currentIndex > 0 ? SEASON_RANK_TABLE[currentIndex - 1] : undefined;
+  if (!next) {
+    return null;
+  }
+  const currentPts = Math.round(clamped * 100);
+  const nextPts = Math.round(next.minScore * 100);
+  return {
+    nextRank: next.id,
+    points: Math.max(1, nextPts - currentPts),
+  };
 }
 
 /**
@@ -117,6 +188,72 @@ export function presentSeasonPillars(
     pillars.push({ id: 'budget', rate: clamp01(season.budgetDiscipline) });
   }
   return pillars;
+}
+
+/**
+ * Purpose: map a 0–1 pillar rate onto Good / Needs attention / Critical.
+ * Inputs: finite rate (clamped).
+ * Outputs: PillarStatus.
+ * Side effects: none.
+ * Design decisions: floors match Season ranks — Temper (0.65) is Good, Forge (0.4) is
+ *   Needs attention, below Forge is Critical. Missing pillars are omitted by the caller.
+ */
+export function pillarStatus(rate: number): PillarStatus {
+  const clamped = clamp01(rate);
+  if (clamped >= 0.65) {
+    return 'good';
+  }
+  if (clamped >= 0.4) {
+    return 'attention';
+  }
+  return 'critical';
+}
+
+/**
+ * Purpose: 0–100 week-over-week Life Score delta, or null when both scores are empty.
+ * Inputs: current and previous 0–1 composites.
+ * Outputs: SeasonTrend or null.
+ * Side effects: none.
+ * Design decisions: rounding happens once here so View does not invent a phantom +1.
+ */
+export function seasonTrendFromScores(current01: number, previous01: number): SeasonTrend | null {
+  const currentScore = Math.round(clamp01(current01) * 100);
+  const previousScore = Math.round(clamp01(previous01) * 100);
+  if (currentScore === 0 && previousScore === 0) {
+    return null;
+  }
+  const points = currentScore - previousScore;
+  const direction: SeasonTrendDirection = points > 0 ? 'up' : points < 0 ? 'down' : 'flat';
+  return { currentScore, previousScore, points, direction };
+}
+
+/**
+ * Purpose: derive Life Score trend by recomputing Season 7 days ago (cheap, same math).
+ * Inputs: same as computeSeasonRank.
+ * Outputs: SeasonTrend or null.
+ * Side effects: none.
+ * Design decisions: reuse computeSeasonRank with now − 7 local days. No extra stats store.
+ */
+export function computeSeasonTrend(
+  entries: JournalEntry[],
+  reminders: Reminder[],
+  budgets: Budget[],
+  expenses: Expense[],
+  currency: MoneyCurrency,
+  now: Date = new Date(),
+): SeasonTrend | null {
+  const current = computeSeasonRank(entries, reminders, budgets, expenses, currency, now);
+  const weekAgo = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate() - SEASON_TREND_DAYS,
+    now.getHours(),
+    now.getMinutes(),
+    now.getSeconds(),
+    now.getMilliseconds(),
+  );
+  const previous = computeSeasonRank(entries, reminders, budgets, expenses, currency, weekAgo);
+  return seasonTrendFromScores(current.score, previous.score);
 }
 
 /**

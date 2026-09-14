@@ -6,11 +6,14 @@ import type { JournalEntry } from '../journal/JournalEntry';
 import type { Reminder } from '../reminders/Reminder';
 import {
   alignedPreviousMonthSoFar,
+  compareBarRatios,
   comparePeriod,
   compareRates,
   computeMonthlyBoardFacts,
   computeWeeklyBoardFacts,
+  monthWritingBars,
   monthWritingPace,
+  moodClimateSegments,
   pageCountBetween,
   weekActivityStrip,
   writingDaysBetween,
@@ -154,6 +157,59 @@ describe('weekActivityStrip / monthWritingPace', () => {
   });
 });
 
+describe('compareBarRatios / monthWritingBars / moodClimate', () => {
+  it('scales this vs last to the larger amount and keeps zeros at 0', () => {
+    const even = compareBarRatios(80, 40, true);
+    assert.equal(even.currentRatio, 1);
+    assert.equal(even.previousRatio, 0.5);
+    const empty = compareBarRatios(0, 0, false);
+    assert.equal(empty.currentRatio, 0);
+    assert.equal(empty.previousRatio, 0);
+    assert.equal(empty.hasPrevious, false);
+    const first = compareBarRatios(50, 0, false);
+    assert.equal(first.currentRatio, 1);
+    assert.equal(first.previousRatio, 0);
+    const down = compareBarRatios(0, 100, true);
+    assert.equal(down.currentRatio, 0);
+    assert.equal(down.previousRatio, 1);
+  });
+
+  it('builds one bar per civil day in September and leaves future empty', () => {
+    const now = new Date(2026, 8, 12, 10);
+    const bars = monthWritingBars([page('a', '2026-09-02'), page('b', '2026-09-02'), page('c', '2026-09-11')], now);
+    assert.equal(bars.length, 30);
+    assert.equal(bars[0]?.dayKey, '2026-09-01');
+    assert.equal(bars[0]?.wrote, false);
+    assert.equal(bars[1]?.wrote, true);
+    assert.equal(bars[11]?.isToday, true);
+    assert.equal(bars[12]?.isFuture, true);
+    assert.equal(bars[12]?.wrote, false);
+  });
+
+  it('shares this-week mix as Good / Steady / Off / Rough without English labels', () => {
+    const entries = [
+      page('h1', '2026-09-07'),
+      page('h2', '2026-09-08'),
+      { ...page('s1', '2026-09-09'), mood: 'sad' as const },
+      { ...page('a1', '2026-09-09'), mood: 'angry' as const },
+    ];
+    const segments = moodClimateSegments(entries, '2026-09-07', '2026-09-09');
+    assert.equal(segments.length, 4);
+    assert.equal(segments[0]?.climate, 'happy');
+    assert.equal(segments[0]?.count, 2);
+    assert.ok(Math.abs((segments[0]?.share ?? 0) - 0.5) < 1e-9);
+    assert.equal(segments[2]?.climate, 'sad');
+    assert.equal(segments[2]?.count, 1);
+    assert.equal(segments[3]?.climate, 'angry');
+    assert.equal(segments[3]?.count, 1);
+    const empty = moodClimateSegments([], '2026-09-07', '2026-09-09');
+    assert.deepEqual(
+      empty.map((row) => row.count),
+      [0, 0, 0, 0],
+    );
+  });
+});
+
 describe('computeWeeklyBoardFacts', () => {
   const now = new Date(2026, 8, 9, 15);
 
@@ -174,29 +230,60 @@ describe('computeWeeklyBoardFacts', () => {
     assert.equal(habits?.value, 100);
     assert.equal(board.sparse, false);
     assert.equal(board.strip.length, 7);
+    assert.equal(board.spendCompare.current, 40);
+    assert.equal(board.spendCompare.previous, 10);
+    assert.equal(board.habitMeter.rate, 1);
+    assert.equal(board.moodClimate[0]?.count, 2);
 
     const empty = computeWeeklyInsightsReport([], [], [], [], 'HKD', now, [], 'monday');
     const emptyBoard = computeWeeklyBoardFacts(empty, [], [], [], now, 'monday');
     assert.equal(emptyBoard.sparse, true);
     assert.equal(emptyBoard.tiles.find((tile) => tile.id === 'habits')?.value, null);
+    assert.equal(emptyBoard.habitMeter.rate, null);
+    assert.equal(emptyBoard.moodClimate.every((row) => row.count === 0), true);
   });
 });
 
 describe('computeMonthlyBoardFacts', () => {
   const now = new Date(2026, 8, 12, 10);
 
-  it('builds five tiles, omits worth without a snapshot, and paces writing', () => {
+  it('builds five tiles, a 30-bar writing series, and a Worth sparkline', () => {
     const entries = [page('sep-a', '2026-09-02'), page('sep-b', '2026-09-11'), page('aug', '2026-08-05')];
     const expenses = [spend('s1', 100, '2026-09-03'), spend('prev', 100, '2026-08-15')];
     const reminders = [habit('run', ['2026-09-01', '2026-09-02', '2026-08-01', '2026-08-02'])];
-    const report = computeMonthlyInsightsReport(entries, expenses, reminders, [], [], 'HKD', now);
-    const board = computeMonthlyBoardFacts(report, entries, reminders, now);
+    const history = [
+      {
+        monthKey: '2026-08',
+        currency: 'HKD' as const,
+        assets: 1000,
+        loans: 0,
+        cardDebt: 0,
+        net: 1000,
+        capturedAt: '2026-08-15T00:00:00.000Z',
+      },
+      {
+        monthKey: '2026-09',
+        currency: 'HKD' as const,
+        assets: 1500,
+        loans: 0,
+        cardDebt: 0,
+        net: 1500,
+        capturedAt: '2026-09-12T00:00:00.000Z',
+      },
+    ];
+    const report = computeMonthlyInsightsReport(entries, expenses, reminders, [], history, 'HKD', now);
+    const board = computeMonthlyBoardFacts(report, entries, reminders, now, history);
     assert.equal(board.tiles.length, 5);
     assert.equal(board.tiles.find((tile) => tile.id === 'pages')?.value, 2);
     assert.equal(board.tiles.find((tile) => tile.id === 'pages')?.delta?.previous, 1);
-    assert.equal(board.tiles.find((tile) => tile.id === 'worth')?.value, null);
+    assert.equal(board.tiles.find((tile) => tile.id === 'worth')?.value, 500);
     assert.equal(board.pace.writingDays, 2);
     assert.equal(board.pace.elapsedDays, 12);
+    assert.equal(board.writingBars.length, 30);
+    assert.equal(board.worthSpark.length, 2);
+    assert.equal(board.spendCompare.hasPrevious, true);
+    assert.equal(board.habitMeter.rate !== null, true);
+    assert.equal(board.moodClimate.some((row) => row.count > 0), true);
     assert.equal(board.sparse, false);
   });
 
@@ -205,5 +292,8 @@ describe('computeMonthlyBoardFacts', () => {
     const board = computeMonthlyBoardFacts(report, [], [], now);
     assert.equal(board.sparse, true);
     assert.equal(board.tiles.find((tile) => tile.id === 'habits')?.value, null);
+    assert.equal(board.writingBars.length, 30);
+    assert.equal(board.worthSpark.length, 0);
+    assert.equal(board.habitMeter.rate, null);
   });
 });

@@ -1,5 +1,61 @@
 # Changelog
 
+## 2026-09-14
+- Date: 2026-09-14
+- Description: **Fix nested Life Score buttons on web** — Today Season hero is a View card; Insights tap (score/rank + meter) and Share Season are sibling Pressables, so react-native-web no longer nests `<button>`. Share Season and next-rank nudge unchanged.
+- Affected modules: View (`TodaySeasonHero.tsx`); CHANGELOG
+- Reason: Bug fix — `<button> cannot contain a nested <button>` at TodaySeasonHero
+- Impact: Low
+
+## 2026-09-14
+- Date: 2026-09-14
+- Description: **Share Season + next-rank nudge** — Life Score can share a local Season card (rank, 0–100, present pillars, optional week trend) via the same view-shot + expo-sharing path as the month report (web: text / Save on phone; never uploaded). Entry points: Today Life Score icon and Insights This week / This month. Next-rank line uses `pointsToNextRank` from `SEASON_RANK_TABLE` (e.g. “12 pts to Temper”); hidden at Steel. Not XP. `react-native-view-shot` was already shipped for the month card — no native rebuild required for this component.
+- Affected modules: Model (`seasonRank.ts` pointsToNextRank, `seasonShare.ts` + tests); View (`TodaySeasonHero.tsx`, `SeasonShareCard.tsx`, `SeasonShareButton.tsx`, `InsightsScreen.tsx`); i18n (`season.nudge` / `season.share*` in en / zh-Hant / zh-Hans / ja); Docs (`UI_DESIGN.md`, `FUNCTIONAL_SPEC.md`, `CHANGELOG.md`)
+- Reason: Product — share the Season glance without a feed; show the next rank as points on the 0–100 meter
+- Impact: Medium
+
+## 2026-09-14
+- Date: 2026-09-14
+- Description: **Mood one language** — UI everywhere is Good / Steady / Off / Rough. Ids stay `happy|neutral|sad|angry`. Compose `MoodPicker`, journal cards, search chips, photo reel, and Insights mix use `mood.*` (en / zh-Hant / zh-Hans / ja). Insights stacked bar is four MoodId slices (Off is no longer lumped into Rough). Field-notebook prompts on `Mood.ts`. `QuickMoodBar` deleted (Compose already has the check-in; not remounted on Today).
+- Affected modules: Model (`Mood.ts`, `boardFacts.ts` + tests, `moodTrends.ts` labels); View (`MoodPicker.tsx`, `InsightsCharts.tsx`, `SearchFilters.tsx`); i18n (en / zh-Hant / zh-Hans / ja); Docs (`UI_DESIGN.md`, `FUNCTIONAL_SPEC.md`, `CHANGELOG.md`)
+- Reason: Product — one mood language on chrome; storage ids stay stable
+- Impact: Medium
+
+## 2026-09-14
+- Date: 2026-09-14
+- Description: **Device pass + dead chrome** — Today stays four above-the-fold blocks (Life Score, Next Up, Mission, optional Summary) + FAB. Confirmed: Focus tab label, Wallet Upcoming first (lede cut), Journal Memories, Insights charts + Takeaway, FAB Thought / Expense / Habit. Deleted unused `TodaySeasonMark`, unrouted `CalendarScreen`, leftover `InsightsConclusion`, unused `InsightsGlanceGrid`, unused `QuickMoodBar`. Removed stale `money.netWorthComingLater` (Worth sparkline already ships).
+- Affected modules: View (Home, MoneyScreen, JournalScreen, InsightsScreen); deleted `TodaySeasonMark.tsx`, `CalendarScreen.tsx`, `InsightsConclusion.tsx`, `InsightsGlanceGrid.tsx`, `QuickMoodBar.tsx`; i18n (empty Wallet lede; drop coming-later string); Docs (`FUNCTIONAL_SPEC.md`, `CHANGELOG.md`)
+- Reason: Product — cut competing/scrolling chrome so Today is a five-second command
+- Impact: Medium
+
+## 2026-09-14
+- Date: 2026-09-14
+- Description: **Fix Insights web crash** — Tab 5 no longer references `InsightsConclusion` or `buildMonthlyInsightsBrief` after the charts pass dropped those imports. This week / This month keep the one-line `InsightsTakeaway` + clay charts. Fast Refresh remounts the week/month panels so a stale conclusion pack cannot throw `ReferenceError`.
+- Affected modules: View (`InsightsScreen.tsx`); CHANGELOG
+- Reason: Bug fix — `Web ERROR [ReferenceError: InsightsConclusion is not defined]`
+- Impact: High
+
+## 2026-09-14
+- Date: 2026-09-14
+- Description: **Insights as charts** — Tab 5 This week | This month is now glance-as-data-viz: one-line takeaway, Season circular score well, writing 7-bar / 30-bar, habit meter, spend vs-last compare bars, month Worth sparkline, optional mood stacked bar. 2×2 glance tiles and the wins/risks/action pack leave the screen. Series math in `boardFacts` (View draws only). Clay View bars, no new chart library, no MoodTrendCharts dump. Sparse frames stay designed. Share month card and week prediction echo kept.
+- Affected modules: Model (`insights/boardFacts.ts` + tests); View (`InsightsScreen.tsx`, `InsightsCharts.tsx`, `InsightsWeekStrip.tsx`, `InsightsSeasonHero.tsx`, `InsightsTakeaway.tsx`); i18n (en / zh-Hant / zh-Hans / ja chart keys); Docs (`UI_DESIGN.md`, `FUNCTIONAL_SPEC.md`, `CHANGELOG.md`)
+- Reason: Product — week and month should glance as charts, still a Life OS (one verdict), not a text scoreboard
+- Impact: High
+
+## 2026-09-14
+- Date: 2026-09-14
+- Description: **Life OS command** — Today is four above-the-fold blocks: Life Score (Season 0–100, week trend, rank, present-only Good / Needs attention / Critical ticks), Next Up, Current Mission (Goal row copy), and a max-3-line rule-based Summary (omit if empty). Tab 3 label is **Focus** (route folder stays `calendar`). FAB tiles are Thought / Expense / Habit. Wallet default is **Upcoming** (bills + subs; Cards remains a tool). Journal gains a **Memories** segment. Insights is conclusion-first (summary / wins / risks / action) with charts below. No cloud LLM, XP, sixth tab, widget wall, HealthKit, or learning tracker.
+- Affected modules: Model (`seasonRank.ts` pillarStatus + computeSeasonTrend, `insights/todaySummary.ts`, `insights/insightsBrief.ts`, `finance/upcomingMoney.ts`, tests); View (Home, TodaySeasonHero, TodaySummaryBlock, TodayFocusRow, FloatingTabBar, HubCaptureFab, GlobalFastCaptureSheet, MoneyScreen, WalletUpcomingPanel, JournalScreen, PhotoMemoriesScreen, InsightsScreen, InsightsConclusion, RhythmScreen title, Onboarding); i18n (en / zh-Hant / zh-Hans / ja); Docs (`UI_DESIGN.md`, `FUNCTIONAL_SPEC.md`, `README.md`, `CHANGELOG.md`)
+- Reason: Product — One Glance. One Action. One Outcome. Map Life OS language onto shipped on-device primitives
+- Impact: High
+
+## 2026-09-14
+- Date: 2026-09-14
+- Description: **Docs only** — added `UI_DESIGN.md` from shipped clay chrome (One Glance. One Action. One Goal.; system UI; GlassSurface is neumorph not blur). Rewrote `FUNCTIONAL_SPEC.md` to the five-hub Life OS (Today / Journal / Rhythm / Wallet / Insights; Settings via cog). README points at both; Today is one-glance, not capsule + recurring strip; Fraunces + Outfit called retired. **Superseded the same day** by the Life OS command entry above (Focus tab, Upcoming Wallet, Memories, conclusion-first Insights).
+- Affected modules: Docs (`UI_DESIGN.md`, `FUNCTIONAL_SPEC.md`, `README.md`, `CHANGELOG.md`)
+- Reason: Product contract lagged shipped IA (old Today/Pages/Calendar/Money/You copy)
+- Impact: Low
+
 ## 2026-09-10
 - Date: 2026-09-10
 - Description: **One-glance Today** — Home is now one Season score, one Next Up action, and one Focus goal above the fold. Compact date + greeting (writing streak dropped; it lives in Season/Insights). Compact Season hero (rank + meter + present-only pillar ticks) replaces the muted Season line; tap opens Insights This month. Recurring strip, prediction, mood bar, this-week chips, photo highlight, on-this-day, and reflection cue leave Today (prediction stays on Insights week; photos stay in Journal / Settings Photos). FAB Write / Spend / Habit unchanged. Five tabs kept. No cloud AI, no Focus Session, no 5-button action row.

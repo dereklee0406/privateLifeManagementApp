@@ -9,10 +9,14 @@ import {
   budgetDisciplineScore,
   compositeSeasonScore,
   computeSeasonRank,
-  presentSeasonPillars,
-  rankFromScore,
-  SEASON_RANK_TABLE,
-  SEASON_WINDOW_DAYS,
+    presentSeasonPillars,
+    pillarStatus,
+    pointsToNextRank,
+    rankFromScore,
+    seasonTrendFromScores,
+    computeSeasonTrend,
+    SEASON_RANK_TABLE,
+    SEASON_WINDOW_DAYS,
 } from './seasonRank';
 
 /**
@@ -135,6 +139,64 @@ describe('compositeSeasonScore', () => {
     assert.equal(compositeSeasonScore(1, 1, 1), 1);
     assert.equal(compositeSeasonScore(0, 0, 0), 0);
     assert.equal(compositeSeasonScore(1, 0, null), 0.5);
+  });
+});
+
+describe('pillarStatus', () => {
+  it('maps Temper+ to Good, Forge to Needs attention, below Forge to Critical', () => {
+    assert.equal(pillarStatus(0.65), 'good');
+    assert.equal(pillarStatus(1), 'good');
+    assert.equal(pillarStatus(0.4), 'attention');
+    assert.equal(pillarStatus(0.64), 'attention');
+    assert.equal(pillarStatus(0.399), 'critical');
+    assert.equal(pillarStatus(0), 'critical');
+    assert.equal(pillarStatus(Number.NaN), 'critical');
+  });
+});
+
+describe('seasonTrendFromScores / computeSeasonTrend', () => {
+  it('omits a trend when both scores are 0', () => {
+    assert.equal(seasonTrendFromScores(0, 0), null);
+  });
+
+  it('reports up / down / flat on 0–100 points', () => {
+    const up = seasonTrendFromScores(0.5, 0.4);
+    assert.equal(up?.currentScore, 50);
+    assert.equal(up?.previousScore, 40);
+    assert.equal(up?.points, 10);
+    assert.equal(up?.direction, 'up');
+    assert.equal(seasonTrendFromScores(0.4, 0.5)?.direction, 'down');
+    assert.equal(seasonTrendFromScores(0.5, 0.5)?.direction, 'flat');
+    assert.equal(seasonTrendFromScores(0.5, 0.5)?.points, 0);
+  });
+
+  it('derives a week-ago trend from the same Season math', () => {
+    const now = new Date(2026, 8, 10, 12);
+    const keys = trailingKeys('2026-09-10', 15);
+    const entries = keys.map((key, index) => page(`p${index}`, key));
+    const trend = computeSeasonTrend(entries, [], [], [], 'HKD', now);
+    assert.ok(trend);
+    assert.equal(trend.direction, 'up');
+    assert.ok(trend.points > 0);
+  });
+});
+
+describe('pointsToNextRank', () => {
+  it('hides the nudge at Steel and counts whole Life Score points to the next floor', () => {
+    assert.equal(pointsToNextRank(0.85), null);
+    assert.equal(pointsToNextRank(1), null);
+    const spark = pointsToNextRank(0);
+    assert.equal(spark?.nextRank, 'ember');
+    assert.equal(spark?.points, 20);
+    const forge = pointsToNextRank(0.53);
+    assert.equal(forge?.nextRank, 'temper');
+    assert.equal(forge?.points, 12);
+    const almost = pointsToNextRank(0.649);
+    assert.equal(almost?.nextRank, 'temper');
+    assert.equal(almost?.points, 1);
+    const temper = pointsToNextRank(0.65);
+    assert.equal(temper?.nextRank, 'steel');
+    assert.equal(temper?.points, 20);
   });
 });
 

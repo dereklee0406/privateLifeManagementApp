@@ -20,6 +20,7 @@ import { ScreenScaffold } from '../components/ScreenScaffold';
 import type { TypeIconName } from '../icons/typeIcons';
 import { useThemeColors } from '../theme/ThemeProvider';
 import { fonts } from '../theme/tokens';
+import { tabScenePaddingBottom } from '../theme/typography';
 
 const FILTERS: { id: PhotoMemoryFilter; icon: TypeIconName }[] = [
   { id: 'all', icon: 'images-outline' },
@@ -27,14 +28,20 @@ const FILTERS: { id: PhotoMemoryFilter; icon: TypeIconName }[] = [
   { id: 'year', icon: 'time-outline' },
 ];
 
+interface PhotoMemoriesScreenProps {
+  /** When true, omit ScreenScaffold/header for Journal Memories segment. */
+  embedded?: boolean;
+}
+
 /**
  * Purpose: photos already on journal pages, grouped by month, plus a private full-screen reel.
- * Inputs: journal entries.
- * Outputs: month grid; tap opens her photo reel (not the page). Empty: one sentence + Write today.
+ * Inputs: journal entries; optional `embedded` for Journal Memories (no stack chrome).
+ * Outputs: month grid; tap opens the photo reel (not the page). Empty: one sentence + Write today.
  * Side effects: navigation to compose or a page from the reel; haptic on opening the reel.
  * Design decisions: this stays an on-device album. No share sheet, comments, or social feed.
+ *   Journal embeds this as Memories — not a sixth tab, not Discover.
  */
-export function PhotoMemoriesScreen() {
+export function PhotoMemoriesScreen({ embedded = false }: PhotoMemoriesScreenProps) {
   const { t, intlLocale } = useI18n();
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
@@ -61,6 +68,94 @@ export function PhotoMemoriesScreen() {
     setReelIndex(index);
   };
 
+  const lede = embedded ? t('journal.memoriesLede') : t('photos.lede');
+  const emptyMessage =
+    photos.length === 0
+      ? embedded
+        ? t('journal.memoriesEmpty')
+        : t('photos.empty')
+      : t('photos.emptyFilter');
+
+  const scrollBody = (
+    <>
+      <Text style={[styles.lede, { color: colors.muted }]}>{lede}</Text>
+      {photos.length > 0 ? (
+        <View style={styles.filters}>
+          {FILTERS.map(({ id, icon }) => (
+            <Chip
+              key={id}
+              icon={icon}
+              label={id === 'all' ? t('common.all') : id === 'month' ? t('photos.thisMonth') : t('photos.thisYear')}
+              selected={filter === id}
+              onPress={() => setFilter(id)}
+            />
+          ))}
+        </View>
+      ) : null}
+      {visible.length === 0 ? (
+        <EmptyState
+          message={emptyMessage}
+          actionLabel={photos.length === 0 ? t('home.writeToday') : undefined}
+          actionIcon={photos.length === 0 ? 'create-outline' : undefined}
+          onAction={photos.length === 0 ? () => router.push('/compose?mode=text') : undefined}
+        />
+      ) : (
+        groups.map((group) => (
+          <View key={group.monthKey} style={styles.month}>
+            <Text style={[styles.monthLabel, { color: colors.muted }]}>{group.label}</Text>
+            <View style={styles.grid}>
+              {group.photos.map((item) => {
+                const index = visible.indexOf(item);
+                return (
+                  <Pressable
+                    key={`${item.entryId}-${item.uri}-${index}`}
+                    onPress={() => openReel(index)}
+                    style={styles.cell}
+                    accessibilityRole="button"
+                    accessibilityLabel={item.title}
+                  >
+                    <JournalMediaImage uri={item.uri} style={styles.thumb} thumbnail />
+                    <Text style={[styles.caption, { color: colors.muted }]} numberOfLines={2}>
+                      {item.title}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+        ))
+      )}
+    </>
+  );
+
+  const reel =
+    reelIndex !== null && visible.length > 0 ? (
+      <PhotoReelViewer
+        photos={visible}
+        startIndex={reelIndex}
+        onClose={() => setReelIndex(null)}
+        onOpenPage={(entryId) => {
+          setReelIndex(null);
+          router.push(`/entry/${entryId}`);
+        }}
+      />
+    ) : null;
+
+  if (embedded) {
+    return (
+      <>
+        <ScrollView
+          style={styles.embeddedScroll}
+          contentContainerStyle={[styles.content, { paddingBottom: tabScenePaddingBottom(insets.bottom) }]}
+          showsVerticalScrollIndicator={false}
+        >
+          {scrollBody}
+        </ScrollView>
+        {reel}
+      </>
+    );
+  }
+
   return (
     <ScreenScaffold>
       <ScreenHeader title={t('photos.title')} />
@@ -68,70 +163,15 @@ export function PhotoMemoriesScreen() {
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 32 }]}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={[styles.lede, { color: colors.muted }]}>{t('photos.lede')}</Text>
-        {photos.length > 0 ? (
-          <View style={styles.filters}>
-            {FILTERS.map(({ id, icon }) => (
-              <Chip
-                key={id}
-                icon={icon}
-                label={id === 'all' ? t('common.all') : id === 'month' ? t('photos.thisMonth') : t('photos.thisYear')}
-                selected={filter === id}
-                onPress={() => setFilter(id)}
-              />
-            ))}
-          </View>
-        ) : null}
-        {visible.length === 0 ? (
-          <EmptyState
-            message={photos.length === 0 ? t('photos.empty') : t('photos.emptyFilter')}
-            actionLabel={photos.length === 0 ? t('home.writeToday') : undefined}
-            actionIcon={photos.length === 0 ? 'create-outline' : undefined}
-            onAction={photos.length === 0 ? () => router.push('/compose?mode=text') : undefined}
-          />
-        ) : (
-          groups.map((group) => (
-            <View key={group.monthKey} style={styles.month}>
-              <Text style={[styles.monthLabel, { color: colors.muted }]}>{group.label}</Text>
-              <View style={styles.grid}>
-                {group.photos.map((item) => {
-                  const index = visible.indexOf(item);
-                  return (
-                    <Pressable
-                      key={`${item.entryId}-${item.uri}-${index}`}
-                      onPress={() => openReel(index)}
-                      style={styles.cell}
-                      accessibilityRole="button"
-                      accessibilityLabel={item.title}
-                    >
-                      <JournalMediaImage uri={item.uri} style={styles.thumb} thumbnail />
-                      <Text style={[styles.caption, { color: colors.muted }]} numberOfLines={2}>
-                        {item.title}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </View>
-          ))
-        )}
+        {scrollBody}
       </ScrollView>
-      {reelIndex !== null && visible.length > 0 ? (
-        <PhotoReelViewer
-          photos={visible}
-          startIndex={reelIndex}
-          onClose={() => setReelIndex(null)}
-          onOpenPage={(entryId) => {
-            setReelIndex(null);
-            router.push(`/entry/${entryId}`);
-          }}
-        />
-      ) : null}
+      {reel}
     </ScreenScaffold>
   );
 }
 
 const styles = StyleSheet.create({
+  embeddedScroll: { flex: 1 },
   content: { paddingHorizontal: 22, gap: 12 },
   lede: { fontFamily: fonts.body, fontSize: 16, lineHeight: 22 },
   filters: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, width: '100%' },

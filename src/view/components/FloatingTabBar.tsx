@@ -18,7 +18,7 @@ interface TabDescriptor {
 const TAB_ICONS: Array<Omit<TabDescriptor, 'label'> & { labelKey: string }> = [
   { name: 'index', labelKey: 'tabs.today', icon: 'home-outline', iconFocused: 'home' },
   { name: 'journal', labelKey: 'tabs.pages', icon: 'book-outline', iconFocused: 'book' },
-  { name: 'calendar', labelKey: 'tabs.rhythm', icon: 'checkbox-outline', iconFocused: 'checkbox' },
+  { name: 'calendar', labelKey: 'tabs.focus', icon: 'checkbox-outline', iconFocused: 'checkbox' },
   { name: 'money', labelKey: 'tabs.money', icon: 'card-outline', iconFocused: 'card' },
   { name: 'insights', labelKey: 'tabs.insights', icon: 'pie-chart-outline', iconFocused: 'pie-chart' },
 ];
@@ -44,11 +44,11 @@ interface FloatingTabBarProps {
 /**
  * Purpose: iOS-like tab bar shared by Android, iOS, and web.
  * Inputs: Expo Router tab bar props.
- * Outputs: edge-to-edge neumorph bar with five SF-style Ionicons + labels (Today, Journal, Rhythm, Wallet, Insights).
+ * Outputs: edge-to-edge neumorph bar with five SF-style Ionicons + labels (Today, Journal, Focus, Wallet, Insights).
  * Side effects: light haptic on tab change; navigation events.
  * Design decisions: not a Material FAB and not a floating island — HIG tab bar + Halo dual-shadow.
  *   Only names listed in TAB_ICONS render. A second tap on the focused tab pops a nested stack.
- *   Tab 3 route folder remains `calendar` for Expo Router stability; label/icon are Rhythm.
+ *   Tab 3 route folder remains `calendar` for Expo Router stability; label is Focus.
  *   Settings is reached from Today or Insights header (or `/settings`), not as a primary tab.
  */
 export function FloatingTabBar({ state, navigation }: FloatingTabBarProps) {

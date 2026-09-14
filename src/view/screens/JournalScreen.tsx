@@ -27,8 +27,9 @@ import { useThemeColors } from '../theme/ThemeProvider';
 import { fonts, raisedSurface } from '../theme/tokens';
 import { tabScenePaddingBottom, type } from '../theme/typography';
 import { JournalCalendarView } from './journal/JournalCalendarView';
+import { PhotoMemoriesScreen } from './PhotoMemoriesScreen';
 
-type JournalViewMode = 'timeline' | 'calendar';
+type JournalViewMode = 'timeline' | 'calendar' | 'memories';
 
 const KIND_CHIPS: Array<{ id: GlobalSearchFilter; label: string; icon: TypeIconName }> = [
   { id: 'all', label: 'All', icon: 'apps-outline' },
@@ -38,12 +39,12 @@ const KIND_CHIPS: Array<{ id: GlobalSearchFilter; label: string; icon: TypeIconN
 ];
 
 /**
- * Purpose: Journal hub — chronological timeline or calendar date companion in one tab.
+ * Purpose: Journal hub — timeline, calendar, or memories (journal photos) in one tab.
  * Inputs: journal, reminders, finance; local view mode + filter form state.
- * Outputs: editorial header, HubSegmentControl (Timeline / Calendar), mode-specific canvas.
+ * Outputs: editorial header, HubSegmentControl (Timeline / Calendar / Memories), mode-specific canvas.
  * Side effects: navigation only (compose / entry / reminder / spend). Filtering lives in Model.
  * Design decisions: Calendar month grid extracted to JournalCalendarView; Timeline keeps
- *   kind chips + SearchFilters. CalendarScreen remains as a standalone fallback.
+ *   kind chips + SearchFilters. Memories embeds journal photos. Mood check-in stays on Compose.
  */
 export function JournalScreen() {
   const colors = useThemeColors();
@@ -62,6 +63,7 @@ export function JournalScreen() {
     (): HubSegmentOption<JournalViewMode>[] => [
       { id: 'timeline', label: t('journal.viewTimeline'), icon: 'time-outline' },
       { id: 'calendar', label: t('journal.viewCalendar'), icon: 'calendar-outline' },
+      { id: 'memories', label: t('journal.viewMemories'), icon: 'images-outline' },
     ],
     [t],
   );
@@ -112,14 +114,7 @@ export function JournalScreen() {
 
   return (
     <ScreenScaffold>
-      <ScrollView
-        contentContainerStyle={[
-          styles.content,
-          { paddingTop: insets.top + 8, paddingBottom: tabScenePaddingBottom(insets.bottom) },
-        ]}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
+      <View style={[styles.chrome, { paddingTop: insets.top + 8 }]}>
         <View style={styles.topRow}>
           <View style={styles.titleBlock}>
             {t('pages.headerKicker') ? (
@@ -168,91 +163,104 @@ export function JournalScreen() {
             </Pressable>
           </View>
         </View>
-
         <HubSegmentControl options={viewOptions} value={viewMode} onChange={setViewMode} />
+      </View>
 
-        {viewMode === 'calendar' ? (
-          <JournalCalendarView />
-        ) : (
-          <>
-            <View style={styles.kinds}>
-              {KIND_CHIPS.map((item) => (
-                <Chip
-                  key={item.id}
-                  icon={item.icon}
-                  label={
-                    item.id === 'all'
-                      ? t('common.all')
-                      : item.id === 'pages'
-                        ? t('pages.title')
-                        : item.id === 'reminders'
-                          ? t('pages.reminders')
-                          : t('pages.money')
-                  }
-                  selected={filter === item.id}
-                  onPress={() => setFilter(item.id)}
-                />
-              ))}
-            </View>
-            <SearchFilters value={query} onChange={setQuery} />
-            {showGlobal ? (
-              hits.length === 0 ? (
-                <EmptyState
-                  message={
-                    query.keywords.trim()
-                      ? t('pages.emptySearch')
-                      : t('pages.emptyBrowse')
-                  }
-                  actionLabel={query.keywords.trim() ? undefined : t('pages.writePage')}
-                  actionIcon={query.keywords.trim() ? undefined : 'create-outline'}
-                  onAction={query.keywords.trim() ? undefined : () => router.push('/compose?mode=text')}
-                />
-              ) : (
-                <GroupedSection>
-                  {hits.map((hit) => {
-                    const reminder = hit.kind === 'reminder' ? reminders.find((row) => row.id === hit.id) : undefined;
-                    const expense = hit.kind === 'spend' ? expenses.find((row) => row.id === hit.id) : undefined;
-                    const typeId = reminder
-                      ? iconIdForReminder(reminder.categoryPath, reminder.templateId)
-                      : expense?.category;
-                    const snippet =
-                      expense
-                        ? [expense.note, expense.dayKey].filter(Boolean).join(' · ')
-                        : hit.snippet;
-                    return (
-                      <GroupedRow
-                        key={`${hit.kind}-${hit.id}`}
-                        leading={typeId ? <TypeIcon typeId={typeId} /> : undefined}
-                        title={hit.title}
-                        subtitle={snippet ? `${kindLabel(hit.kind)} · ${snippet}` : kindLabel(hit.kind)}
-                        onPress={() => openHit(hit)}
-                        chevron
-                      />
-                    );
-                  })}
-                </GroupedSection>
-              )
-            ) : sections.length === 0 ? (
-              <View style={styles.emptyBlock}>
-                <EmptyState
-                  message={searching ? t('pages.emptyFilter') : t('pages.emptyTimeline')}
-                  actionLabel={searching ? undefined : t('pages.writePage')}
-                  actionIcon={searching ? undefined : 'create-outline'}
-                  onAction={searching ? undefined : () => router.push('/compose?mode=text')}
-                />
+      {viewMode === 'memories' ? (
+        <PhotoMemoriesScreen embedded />
+      ) : (
+        <ScrollView
+          style={styles.hubScroll}
+          contentContainerStyle={[
+            styles.content,
+            { paddingBottom: tabScenePaddingBottom(insets.bottom) },
+          ]}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {viewMode === 'calendar' ? (
+            <JournalCalendarView />
+          ) : (
+            <>
+              <View style={styles.kinds}>
+                {KIND_CHIPS.map((item) => (
+                  <Chip
+                    key={item.id}
+                    icon={item.icon}
+                    label={
+                      item.id === 'all'
+                        ? t('common.all')
+                        : item.id === 'pages'
+                          ? t('pages.title')
+                          : item.id === 'reminders'
+                            ? t('pages.reminders')
+                            : t('pages.money')
+                    }
+                    selected={filter === item.id}
+                    onPress={() => setFilter(item.id)}
+                  />
+                ))}
               </View>
-            ) : (
-              sections.map((section) => (
-                <GroupedSection key={section.bucket} header={section.label}>
-                  {section.entries.map((entry) => (
-                    <EntryCard key={entry.id} entry={entry} grouped onPress={() => router.push(`/entry/${entry.id}`)} />
-                  ))}
-                </GroupedSection>
-              ))
-            )}
-          </>
-        )}
-      </ScrollView>
+              <SearchFilters value={query} onChange={setQuery} />
+              {showGlobal ? (
+                hits.length === 0 ? (
+                  <EmptyState
+                    message={
+                      query.keywords.trim()
+                        ? t('pages.emptySearch')
+                        : t('pages.emptyBrowse')
+                    }
+                    actionLabel={query.keywords.trim() ? undefined : t('pages.writePage')}
+                    actionIcon={query.keywords.trim() ? undefined : 'create-outline'}
+                    onAction={query.keywords.trim() ? undefined : () => router.push('/compose?mode=text')}
+                  />
+                ) : (
+                  <GroupedSection>
+                    {hits.map((hit) => {
+                      const reminder = hit.kind === 'reminder' ? reminders.find((row) => row.id === hit.id) : undefined;
+                      const expense = hit.kind === 'spend' ? expenses.find((row) => row.id === hit.id) : undefined;
+                      const typeId = reminder
+                        ? iconIdForReminder(reminder.categoryPath, reminder.templateId)
+                        : expense?.category;
+                      const snippet =
+                        expense
+                          ? [expense.note, expense.dayKey].filter(Boolean).join(' · ')
+                          : hit.snippet;
+                      return (
+                        <GroupedRow
+                          key={`${hit.kind}-${hit.id}`}
+                          leading={typeId ? <TypeIcon typeId={typeId} /> : undefined}
+                          title={hit.title}
+                          subtitle={snippet ? `${kindLabel(hit.kind)} · ${snippet}` : kindLabel(hit.kind)}
+                          onPress={() => openHit(hit)}
+                          chevron
+                        />
+                      );
+                    })}
+                  </GroupedSection>
+                )
+              ) : sections.length === 0 ? (
+                <View style={styles.emptyBlock}>
+                  <EmptyState
+                    message={searching ? t('pages.emptyFilter') : t('pages.emptyTimeline')}
+                    actionLabel={searching ? undefined : t('pages.writePage')}
+                    actionIcon={searching ? undefined : 'create-outline'}
+                    onAction={searching ? undefined : () => router.push('/compose?mode=text')}
+                  />
+                </View>
+              ) : (
+                sections.map((section) => (
+                  <GroupedSection key={section.bucket} header={section.label}>
+                    {section.entries.map((entry) => (
+                      <EntryCard key={entry.id} entry={entry} grouped onPress={() => router.push(`/entry/${entry.id}`)} />
+                    ))}
+                  </GroupedSection>
+                ))
+              )}
+            </>
+          )}
+        </ScrollView>
+      )}
       <PromptLibrarySheet
         visible={promptOpen}
         onClose={() => setPromptOpen(false)}
@@ -266,6 +274,14 @@ export function JournalScreen() {
 }
 
 const styles = StyleSheet.create({
+  chrome: {
+    paddingHorizontal: 20,
+    gap: 12,
+    paddingBottom: 8,
+  },
+  hubScroll: {
+    flex: 1,
+  },
   content: {
     paddingHorizontal: 20,
     gap: 12,

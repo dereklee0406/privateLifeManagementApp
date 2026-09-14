@@ -54,9 +54,10 @@ import { tabScenePaddingBottom, type } from '../theme/typography';
 import { useI18n, type Translate } from '../i18n';
 import { PaymentCardsScreen } from './PaymentCardsScreen';
 import { SubscriptionsCockpitScreen } from './SubscriptionsCockpitScreen';
+import { WalletUpcomingPanel } from './WalletUpcomingPanel';
 import { WalletWorthPanel } from './WalletWorthPanel';
 
-type MoneyHubSegment = 'cashflow' | 'subscriptions' | 'cards' | 'worth';
+type MoneyHubSegment = 'upcoming' | 'cashflow' | 'subscriptions' | 'cards' | 'worth';
 type MoneyFocus = 'all' | 'income' | 'expenses' | 'transfers' | 'budgets';
 
 /**
@@ -67,7 +68,7 @@ type MoneyFocus = 'all' | 'income' | 'expenses' | 'transfers' | 'budgets';
  */
 function parseMoneySegment(raw: string | string[] | undefined): MoneyHubSegment | null {
   const value = Array.isArray(raw) ? raw[0] : raw;
-  if (value === 'cashflow' || value === 'subscriptions' || value === 'cards' || value === 'worth') {
+  if (value === 'upcoming' || value === 'cashflow' || value === 'subscriptions' || value === 'cards' || value === 'worth') {
     return value;
   }
   return null;
@@ -155,13 +156,14 @@ function spendFxEstimateLine(item: Expense): string | undefined {
 }
 
 /**
- * Purpose: Wallet tab — 4-segment financial hub (Cashflow / Recurring / Cards / Worth).
+ * Purpose: Wallet tab — Upcoming first, then Cashflow / Subscriptions / Worth. Cards is a tool.
  * Inputs: finance, reminders, settings; optional `segment` search param for deep links.
- * Outputs: editorial header + neumorphic segment control; Cashflow canvas or embedded
- *   Subscriptions / Payment Cards / Worth panels while the floating tab bar stays visible.
+ * Outputs: editorial header + neumorphic segment control; Upcoming canvas or embedded
+ *   Cashflow / Subscriptions / Worth / Cards panels while the floating tab bar stays visible.
  * Side effects: inline budget saves; navigation to composers; QuickSpend sheet.
- * Design decisions: Worth is always a visible segment (empty state invites the first asset).
- *   showAdvancedFinance still gates Cashflow extras only. Subscriptions & cards stay in-tab.
+ * Design decisions: Upcoming is the default (bills + subs due). Cards stays reachable from
+ *   Upcoming (and `segment=cards`) so the rebate engine is not hidden. Worth stays visible.
+ *   No hub lede — Upcoming is the glance.
  */
 export function MoneyScreen() {
   const { t, intlLocale } = useI18n();
@@ -185,7 +187,7 @@ export function MoneyScreen() {
   const extrasOn = resolveShowAdvancedFinance(settings, hasAssetsOrLoans);
   const [openExtras, setOpenExtras] = useState(extrasOn);
   const showExtras = extrasOn || openExtras;
-  const [hub, setHub] = useState<MoneyHubSegment>(() => parseMoneySegment(params.segment) ?? 'cashflow');
+  const [hub, setHub] = useState<MoneyHubSegment>(() => parseMoneySegment(params.segment) ?? 'upcoming');
   const [focus, setFocus] = useState<MoneyFocus>('all');
   const [expenseCategory, setExpenseCategory] = useState<ExpenseCategory | 'all'>('all');
   const [expensePreset, setExpensePreset] = useState<ExpenseDatePreset>('month');
@@ -211,9 +213,9 @@ export function MoneyScreen() {
 
   const hubOptions = useMemo(
     (): HubSegmentOption<MoneyHubSegment>[] => [
+      { id: 'upcoming', label: t('money.tabUpcoming'), icon: 'calendar-outline' },
       { id: 'cashflow', label: t('money.tabCashflow'), icon: 'wallet-outline' },
       { id: 'subscriptions', label: t('money.tabSubscriptions'), icon: 'repeat-outline' },
-      { id: 'cards', label: t('money.tabCards'), icon: 'card-outline' },
       { id: 'worth', label: t('worth.tab'), icon: 'stats-chart-outline' },
     ],
     [t],
@@ -288,9 +290,19 @@ export function MoneyScreen() {
             <Ionicons name="flash-outline" size={20} color={colors.ink} accessible={false} importantForAccessibility="no" />
           </Pressable>
         </View>
-        <Text style={[styles.lede, { color: colors.muted }]}>{t('money.lede')}</Text>
         <HubSegmentControl options={hubOptions} value={hub} onChange={setHub} />
       </View>
+
+      {hub === 'upcoming' ? (
+        <ScrollView
+          style={styles.hubScroll}
+          contentContainerStyle={{ paddingBottom: tabScenePaddingBottom(insets.bottom), gap: 12 }}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <WalletUpcomingPanel onOpenCards={() => setHub('cards')} />
+        </ScrollView>
+      ) : null}
 
       {hub === 'cashflow' ? (
         <ScrollView
@@ -893,7 +905,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  lede: { fontFamily: fonts.body, fontSize: 16, lineHeight: 22 },
   hero: { padding: 20, gap: 6 },
   kicker: { fontFamily: fonts.bodySemi, fontSize: 13 },
   heroValue: { fontFamily: fonts.display, fontSize: 36, lineHeight: 42, fontVariant: ['tabular-nums'] },

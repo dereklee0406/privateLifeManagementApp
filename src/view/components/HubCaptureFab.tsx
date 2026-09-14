@@ -11,9 +11,9 @@ import { GlobalFastCaptureSheet } from './GlobalFastCaptureSheet';
 import { QuickSpendSheet } from './QuickSpendSheet';
 
 /**
- * Purpose: one Fast Capture FAB shared by all five hubs (Today, Journal, Rhythm, Wallet, Insights).
+ * Purpose: one Fast Capture FAB shared by all five hubs (Today, Journal, Focus, Wallet, Insights).
  * Inputs: none — owns its own sheet visibility.
- * Outputs: accent FAB + GlobalFastCaptureSheet (Write / Spend / Habit) + QuickSpendSheet handoff.
+ * Outputs: accent FAB + GlobalFastCaptureSheet (Thought / Expense / Habit) + QuickSpendSheet handoff.
  * Side effects: light haptic on open; spend tile opens QuickSpendSheet after the capture sheet closes.
  * Design decisions: each hub screen mounts this once so the FAB sits in ScreenScaffold (full
  *   scene), not inside the tab bar (which would clip overflow). Transfer stays off the sheet
